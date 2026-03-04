@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { ShoutoutRow } from '../actions/feed-actions'
 import { reactToShoutout } from '../actions/reaction-actions'
 import { reportShoutout } from '../actions/report-actions'
+import { CommentSection } from './CommentSection'
 import { calculateDistance, formatDistance, getRelativeTime } from '@/shared/lib/geo-utils'
 
 const REPORT_REASONS = [
@@ -18,13 +19,16 @@ interface ShoutoutCardProps {
   userLat: number
   userLng: number
   sessionId: string
+  alias: string
   userReaction?: 'confirm' | 'doubt' | null
 }
 
-export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, userReaction }: ShoutoutCardProps) {
+export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, userReaction }: ShoutoutCardProps) {
   const distance = calculateDistance(userLat, userLng, shoutout.lat, shoutout.lng)
+  const [expanded, setExpanded] = useState(false)
   const [confirm, setConfirm] = useState(shoutout.reactions_confirm)
   const [doubt, setDoubt] = useState(shoutout.reactions_doubt)
+  const [commentsCount, setCommentsCount] = useState(shoutout.comments_count)
   const [reaction, setReaction] = useState<'confirm' | 'doubt' | null>(userReaction ?? null)
   const [isPending, startTransition] = useTransition()
 
@@ -75,21 +79,78 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, userReacti
 
   return (
     <div className="shoutout-card animate-slide-up relative">
-      <div className="flex items-start gap-3">
-        <span className="text-3xl">{shoutout.emoji}</span>
+      {/* Clickable header area */}
+      <div
+        className="cursor-pointer"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-3xl">{shoutout.emoji}</span>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <span className="badge-brutal bg-brutal-cyan text-xs">
-                {shoutout.category}
-              </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="badge-brutal bg-brutal-cyan text-xs">
+                  {shoutout.category}
+                </span>
+                <span className="text-xs text-foreground-muted font-medium">
+                  {shoutout.source === 'voice' ? '🎙️' : '✏️'}
+                </span>
+              </div>
               <span className="text-xs text-foreground-muted font-medium">
-                {shoutout.source === 'voice' ? '🎙️' : '✏️'}
+                {expanded ? '▲' : '▼'}
               </span>
             </div>
 
-            {/* Report button */}
+            <p className="font-bold text-sm mb-1">{shoutout.summary}</p>
+
+            {!expanded && (
+              <p className="text-sm text-foreground-secondary line-clamp-1">{shoutout.text}</p>
+            )}
+
+            <div className="flex items-center gap-3 mt-2 text-xs text-foreground-muted font-medium">
+              <span>👤 {shoutout.alias}</span>
+              <span>📍 {formatDistance(distance)}</span>
+              <span>🕐 {getRelativeTime(shoutout.created_at)}</span>
+              <span>💬 {commentsCount}</span>
+            </div>
+
+            {/* Reaction buttons (always visible) */}
+            <div className="flex items-center gap-3 mt-2" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => handleReact('confirm')}
+                disabled={isPending}
+                className={`badge-brutal text-xs cursor-pointer transition-all ${
+                  reaction === 'confirm'
+                    ? 'bg-brutal-lime border-[3px] shadow-brutal'
+                    : 'bg-brutal-lime/50 hover:bg-brutal-lime'
+                } disabled:opacity-50`}
+              >
+                ✅ {confirm}
+              </button>
+              <button
+                onClick={() => handleReact('doubt')}
+                disabled={isPending}
+                className={`badge-brutal text-xs cursor-pointer transition-all ${
+                  reaction === 'doubt'
+                    ? 'bg-brutal-yellow border-[3px] shadow-brutal'
+                    : 'bg-brutal-yellow/50 hover:bg-brutal-yellow'
+                } disabled:opacity-50`}
+              >
+                🤔 {doubt}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="mt-3 animate-fade-in">
+          <p className="text-sm text-foreground-secondary whitespace-pre-wrap">{shoutout.text}</p>
+
+          {/* Report */}
+          <div className="flex justify-end mt-2" onClick={e => e.stopPropagation()}>
             {!reported ? (
               <button
                 onClick={() => setShowReport(!showReport)}
@@ -97,51 +158,15 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, userReacti
                 className="text-foreground-muted hover:text-foreground text-xs px-1 disabled:opacity-50"
                 aria-label="Reportar"
               >
-                🚩
+                🚩 Reportar
               </button>
             ) : (
               <span className="text-xs text-foreground-muted">Reportado</span>
             )}
           </div>
 
-          <p className="font-bold text-sm mb-1">{shoutout.summary}</p>
-          <p className="text-sm text-foreground-secondary line-clamp-2">{shoutout.text}</p>
-
-          <div className="flex items-center gap-3 mt-2 text-xs text-foreground-muted font-medium">
-            <span>👤 {shoutout.alias}</span>
-            <span>📍 {formatDistance(distance)}</span>
-            <span>🕐 {getRelativeTime(shoutout.created_at)}</span>
-          </div>
-
-          {/* Reaction buttons */}
-          <div className="flex items-center gap-3 mt-2">
-            <button
-              onClick={() => handleReact('confirm')}
-              disabled={isPending}
-              className={`badge-brutal text-xs cursor-pointer transition-all ${
-                reaction === 'confirm'
-                  ? 'bg-brutal-lime border-[3px] shadow-brutal'
-                  : 'bg-brutal-lime/50 hover:bg-brutal-lime'
-              } disabled:opacity-50`}
-            >
-              ✅ {confirm}
-            </button>
-            <button
-              onClick={() => handleReact('doubt')}
-              disabled={isPending}
-              className={`badge-brutal text-xs cursor-pointer transition-all ${
-                reaction === 'doubt'
-                  ? 'bg-brutal-yellow border-[3px] shadow-brutal'
-                  : 'bg-brutal-yellow/50 hover:bg-brutal-yellow'
-              } disabled:opacity-50`}
-            >
-              🤔 {doubt}
-            </button>
-          </div>
-
-          {/* Report popover */}
           {showReport && (
-            <div className="mt-2 card-brutal bg-white p-3 animate-fade-in">
+            <div className="mt-2 card-brutal bg-white p-3 animate-fade-in" onClick={e => e.stopPropagation()}>
               <p className="text-xs font-bold mb-2">Motivo del reporte:</p>
               <div className="flex flex-wrap gap-2">
                 {REPORT_REASONS.map(r => (
@@ -157,8 +182,17 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, userReacti
               </div>
             </div>
           )}
+
+          {/* Comments section (loaded on demand) */}
+          <div onClick={e => e.stopPropagation()}>
+            <CommentSection
+              shoutoutId={shoutout.id}
+              sessionId={sessionId}
+              alias={alias}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

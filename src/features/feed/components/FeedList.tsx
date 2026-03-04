@@ -16,7 +16,7 @@ export function FeedList({ lat, lng }: FeedListProps) {
   const [shoutouts, setShoutouts] = useState<ShoutoutRow[]>([])
   const [reactions, setReactions] = useState<Record<string, 'confirm' | 'doubt'>>({})
   const [loading, setLoading] = useState(true)
-  const { sessionId } = useSessionStore()
+  const { sessionId, alias } = useSessionStore()
 
   const fetchShoutouts = useCallback(async () => {
     setLoading(true)
@@ -85,6 +85,7 @@ export function FeedList({ lat, lng }: FeedListProps) {
               userLat={lat}
               userLng={lng}
               sessionId={sessionId}
+              alias={alias}
               userReaction={reactions[shoutout.id] ?? null}
             />
           ))}

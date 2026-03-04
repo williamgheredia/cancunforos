@@ -18,6 +18,7 @@ export interface ShoutoutRow {
   reactions_doubt: number
   reports_count: number
   is_collapsed: boolean
+  comments_count: number
   created_at: string
   expires_at: string
 }
@@ -39,6 +40,7 @@ export async function getActiveShoutouts(
     .lte('lat', lat + latDelta)
     .gte('lng', lng - lngDelta)
     .lte('lng', lng + lngDelta)
+    .order('reactions_confirm', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(50)
 
