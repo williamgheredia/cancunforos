@@ -149,6 +149,9 @@ function GridCellMarker({
     ? [cell.shoutouts[0].lat, cell.shoutouts[0].lng]
     : [cell.centerLat, cell.centerLng]
 
+  // Key forces Leaflet to re-create the popup when selection changes
+  const popupKey = selected ? `detail-${selected.id}` : 'list'
+
   return (
     <Marker
       position={position}
@@ -157,7 +160,7 @@ function GridCellMarker({
         popupclose: () => setSelected(null),
       }}
     >
-      <Popup>
+      <Popup key={popupKey}>
         {selected ? (
           <MapShoutoutDetail
             shoutout={selected}
@@ -346,13 +349,13 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
           }}
         />
 
-        {/* User position */}
+        {/* User position - cyan smiley, distinct from gold spots */}
         <Marker
           position={[lat, lng]}
           icon={L.divIcon({
-            html: '<div style="font-size:18px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#facc15;border:3px solid #000;box-shadow:2px 2px 0 #000;">📍</div>',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            html: '<div style="font-size:20px;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#00D4FF;border:3px solid #000;box-shadow:3px 3px 0 #000;animation:pulse 2s infinite;">😊</div>',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
             className: '',
           })}
         >
