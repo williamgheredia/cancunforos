@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useSessionStore } from '@/shared/stores/session-store'
 import { useGeolocation } from '@/shared/hooks/use-geolocation'
-import { FeedHeader, FeedList } from '@/features/feed/components'
+import { FeedHeader, FeedList, TopShoutouts } from '@/features/feed/components'
 import { CreateShoutoutModal } from '@/features/shoutout/components'
 
 const MapView = dynamic(
@@ -17,22 +17,26 @@ const MapView = dynamic(
   )}
 )
 
-type Tab = 'feed' | 'mapa'
-
-const ZONES = ['Todas', 'Zona Hotelera', 'Centro', 'SM 25', 'SM 20', 'Bonampak', 'Puerto Morelos']
+type Tab = 'feed' | 'mapa' | 'shoutouts'
 
 export default function HomePage() {
   const { alias, initSession } = useSessionStore()
   const { lat, lng, loading: geoLoading, error: geoError, refresh: refreshGeo } = useGeolocation()
   const [feedKey, setFeedKey] = useState(0)
   const [tab, setTab] = useState<Tab>('feed')
-  const [zone, setZone] = useState('Todas')
 
   useEffect(() => {
     initSession()
   }, [initSession])
 
   const hasLocation = !geoLoading && !geoError && lat && lng
+
+  const tabStyle = (t: Tab) =>
+    `border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
+      tab === t
+        ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
+        : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
+    }`
 
   return (
     <main className="min-h-screen bg-[#f0ede6]">
@@ -41,47 +45,17 @@ export default function HomePage() {
 
         {/* Tabs */}
         {hasLocation && (
-          <>
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => setTab('feed')}
-                className={`border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
-                  tab === 'feed'
-                    ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
-                    : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
-                }`}
-              >
-                📡 FEED
-              </button>
-              <button
-                onClick={() => setTab('mapa')}
-                className={`border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
-                  tab === 'mapa'
-                    ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
-                    : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
-                }`}
-              >
-                🗺️ MAPA
-              </button>
-            </div>
-
-            {/* CAMBIO 4: Zone filter chips */}
-            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide pb-1">
-              {ZONES.map(z => (
-                <button
-                  key={z}
-                  onClick={() => setZone(z)}
-                  className={`whitespace-nowrap flex-shrink-0 border-2 border-black px-3 py-1 font-extrabold text-xs transition-all duration-100 ${
-                    zone === z
-                      ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
-                      : 'bg-black/10 shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
-                  }`}
-                >
-                  {z}
-                </button>
-              ))}
-            </div>
-          </>
+          <div className="flex gap-2 mt-4">
+            <button onClick={() => setTab('feed')} className={tabStyle('feed')}>
+              📡 FEED
+            </button>
+            <button onClick={() => setTab('shoutouts')} className={tabStyle('shoutouts')}>
+              🔥 SHOUTOUTS
+            </button>
+            <button onClick={() => setTab('mapa')} className={tabStyle('mapa')}>
+              🗺️ MAPA
+            </button>
+          </div>
         )}
 
         <div className="mt-4">
@@ -115,6 +89,8 @@ export default function HomePage() {
               lat={lat!}
               lng={lng!}
             />
+          ) : tab === 'shoutouts' ? (
+            <TopShoutouts lat={lat!} lng={lng!} />
           ) : (
             <MapView lat={lat!} lng={lng!} />
           )}

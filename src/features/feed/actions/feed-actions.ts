@@ -47,3 +47,40 @@ export async function getActiveShoutouts(
   if (error) throw new Error(error.message)
   return (data ?? []) as ShoutoutRow[]
 }
+
+export async function getTopShoutouts(
+  lat: number,
+  lng: number,
+  minKm: number,
+  maxKm: number
+): Promise<ShoutoutRow[]> {
+  const supabase = await createClient()
+  const { latDelta: minLatD, lngDelta: minLngD } = getBoundingBox(lat, minKm)
+  const { latDelta: maxLatD, lngDelta: maxLngD } = getBoundingBox(lat, maxKm)
+
+  // Get all within maxKm bounding box, then filter out those within minKm client-side
+  const { data, error } = await supabase
+    .from('shoutouts')
+    .select('*')
+    .eq('is_collapsed', false)
+    .gte('lat', lat - maxLatD)
+    .lte('lat', lat + maxLatD)
+    .gte('lng', lng - maxLngD)
+    .lte('lng', lng + maxLngD)
+    .order('reactions_confirm', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw new Error(error.message)
+
+  // Filter to only include shoutouts in the min-max ring
+  const rows = (data ?? []) as ShoutoutRow[]
+  if (minKm === 0) return rows
+
+  return rows.filter(s => {
+    const dLat = (s.lat - lat) * 111.32
+    const dLng = (s.lng - lng) * 111.32 * Math.cos(lat * Math.PI / 180)
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+    return dist >= minKm
+  })
+}
