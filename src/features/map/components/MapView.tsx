@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
-import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getActiveShoutouts, type ShoutoutRow } from '@/features/feed/actions/feed-actions'
@@ -15,6 +14,60 @@ interface MapViewProps {
   lat: number
   lng: number
   onSpotCreated?: () => void
+}
+
+const CATEGORY_BG: Record<string, string> = {
+  alerta: '#f87171', trafico: '#fb923c', comida: '#a3e635',
+  evento: '#67e8f9', clima: '#93c5fd', oferta: '#fde047',
+  tip: '#c4b5fd', otro: '#e5e7eb',
+}
+
+interface GridCell {
+  key: string
+  centerLat: number
+  centerLng: number
+  shoutouts: ShoutoutRow[]
+  topEmoji: string
+  topCategory: string
+}
+
+// ~200m grid cells
+const GRID_SIZE_LAT = 0.002
+const GRID_SIZE_LNG = 0.0025
+
+function groupByGrid(shoutouts: ShoutoutRow[]): GridCell[] {
+  const map = new Map<string, ShoutoutRow[]>()
+
+  for (const s of shoutouts) {
+    const gLat = Math.floor(s.lat / GRID_SIZE_LAT)
+    const gLng = Math.floor(s.lng / GRID_SIZE_LNG)
+    const key = `${gLat}_${gLng}`
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(s)
+  }
+
+  const cells: GridCell[] = []
+  for (const [key, items] of map) {
+    // Sort by confirms desc to find "top" shoutout
+    const sorted = [...items].sort((a, b) => b.reactions_confirm - a.reactions_confirm)
+    const top = sorted[0]
+
+    // Center of the grid cell
+    const [gLatStr, gLngStr] = key.split('_')
+    const gLat = parseInt(gLatStr)
+    const gLng = parseInt(gLngStr)
+
+    cells.push({
+      key,
+      centerLat: (gLat + 0.5) * GRID_SIZE_LAT,
+      centerLng: (gLng + 0.5) * GRID_SIZE_LNG,
+      shoutouts: sorted,
+      topEmoji: top.emoji,
+      topCategory: top.category,
+    })
+  }
+
+  return cells
 }
 
 function emojiIcon(emoji: string, isSpot = false): L.DivIcon {
@@ -37,24 +90,28 @@ function emojiIcon(emoji: string, isSpot = false): L.DivIcon {
   })
 }
 
-function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
-  const count = cluster.getChildCount()
+function bubbleIcon(count: number, emoji: string, category: string): L.DivIcon {
+  const bg = CATEGORY_BG[category.toLowerCase()] ?? '#e5e7eb'
   return L.divIcon({
     html: `<div style="
-      width: 44px;
-      height: 44px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #000;
-      color: #facc15;
+      background: ${bg};
       border: 3px solid #000;
-      box-shadow: 3px 3px 0 #facc15;
-      font-weight: 900;
-      font-size: 14px;
+      box-shadow: 3px 3px 0 #000;
+      padding: 4px 10px;
       font-family: 'Space Grotesk', system-ui, sans-serif;
-    ">${count}</div>`,
-    iconSize: [44, 44],
+      line-height: 1.2;
+      min-width: 52px;
+    ">
+      <span style="font-size:14px;font-weight:900;">${emoji} ${count}</span>
+      <span style="font-size:9px;font-weight:800;text-transform:uppercase;opacity:0.7;">${category}</span>
+    </div>`,
+    iconSize: [60, 44],
+    iconAnchor: [30, 22],
+    popupAnchor: [0, -26],
     className: '',
   })
 }
@@ -98,6 +155,8 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
     }
     fetchData()
   }
+
+  const gridCells = groupByGrid(shoutouts)
 
   if (loading) {
     return (
@@ -159,33 +218,59 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
           </Popup>
         </Marker>
 
-        {/* Clustered shoutout markers */}
-        <MarkerClusterGroup
-          iconCreateFunction={createClusterIcon}
-          maxClusterRadius={50}
-          spiderfyOnMaxZoom
-          showCoverageOnHover={false}
-        >
-          {shoutouts.map(s => (
+        {/* Shoutout grid cells */}
+        {gridCells.map(cell => {
+          if (cell.shoutouts.length === 1) {
+            // Single shoutout: show emoji pin
+            const s = cell.shoutouts[0]
+            return (
+              <Marker
+                key={`s-${s.id}`}
+                position={[s.lat, s.lng]}
+                icon={emojiIcon(s.emoji)}
+              >
+                <Popup>
+                  <div style={{ minWidth: 180 }}>
+                    <p style={{ fontWeight: 900, margin: '0 0 4px' }}>{s.emoji} {s.summary}</p>
+                    <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px' }}>{s.text.slice(0, 80)}{s.text.length > 80 ? '...' : ''}</p>
+                    <p style={{ fontSize: '11px', color: '#737373', margin: 0 }}>
+                      {s.category} · {formatDistance(calculateDistance(lat, lng, s.lat, s.lng))} · {getRelativeTime(s.created_at)}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          }
+
+          // Multiple shoutouts: show bubble with count
+          return (
             <Marker
-              key={`s-${s.id}`}
-              position={[s.lat, s.lng]}
-              icon={emojiIcon(s.emoji)}
+              key={`grid-${cell.key}`}
+              position={[cell.centerLat, cell.centerLng]}
+              icon={bubbleIcon(cell.shoutouts.length, cell.topEmoji, cell.topCategory)}
             >
               <Popup>
-                <div style={{ minWidth: 180 }}>
-                  <p style={{ fontWeight: 900, margin: '0 0 4px' }}>{s.emoji} {s.summary}</p>
-                  <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px' }}>{s.text.slice(0, 80)}{s.text.length > 80 ? '...' : ''}</p>
-                  <p style={{ fontSize: '11px', color: '#737373', margin: 0 }}>
-                    {s.category} · {formatDistance(calculateDistance(lat, lng, s.lat, s.lng))} · {getRelativeTime(s.created_at)}
+                <div style={{ minWidth: 200, maxHeight: 200, overflowY: 'auto' }}>
+                  <p style={{ fontWeight: 900, margin: '0 0 6px', fontSize: '13px', textTransform: 'uppercase' }}>
+                    {cell.shoutouts.length} shoutouts
                   </p>
+                  {cell.shoutouts.map(s => (
+                    <div key={s.id} style={{ borderBottom: '1px solid #e5e7eb', padding: '4px 0' }}>
+                      <p style={{ fontWeight: 800, fontSize: '12px', margin: 0 }}>
+                        {s.emoji} {s.summary}
+                      </p>
+                      <p style={{ fontSize: '10px', color: '#737373', margin: '2px 0 0' }}>
+                        {s.category} · {formatDistance(calculateDistance(lat, lng, s.lat, s.lng))} · ✅{s.reactions_confirm}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </Popup>
             </Marker>
-          ))}
-        </MarkerClusterGroup>
+          )
+        })}
 
-        {/* Spot markers (gold, NOT clustered) */}
+        {/* Spot markers (gold, NOT grouped) */}
         {spots.map(sp => (
           <Marker
             key={`sp-${sp.id}`}
