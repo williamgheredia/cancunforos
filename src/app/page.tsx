@@ -10,20 +10,23 @@ import { CreateShoutoutModal } from '@/features/shoutout/components'
 const MapView = dynamic(
   () => import('@/features/map/components/MapView').then(m => ({ default: m.MapView })),
   { ssr: false, loading: () => (
-    <div className="card-brutal p-8 text-center animate-fade-in">
+    <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000] p-8 text-center animate-fade-in">
       <span className="text-4xl block mb-2">🗺️</span>
-      <p className="font-bold">Cargando mapa...</p>
+      <p className="font-black uppercase">Cargando mapa...</p>
     </div>
   )}
 )
 
 type Tab = 'feed' | 'mapa'
 
+const ZONES = ['Todas', 'Zona Hotelera', 'Centro', 'SM 25', 'SM 20', 'Bonampak', 'Puerto Morelos']
+
 export default function HomePage() {
   const { alias, initSession } = useSessionStore()
   const { lat, lng, loading: geoLoading, error: geoError, refresh: refreshGeo } = useGeolocation()
   const [feedKey, setFeedKey] = useState(0)
   const [tab, setTab] = useState<Tab>('feed')
+  const [zone, setZone] = useState('Todas')
 
   useEffect(() => {
     initSession()
@@ -32,53 +35,76 @@ export default function HomePage() {
   const hasLocation = !geoLoading && !geoError && lat && lng
 
   return (
-    <main className="min-h-screen bg-[#F5F5F0]">
+    <main className="min-h-screen bg-[#f0ede6]">
       <div className="max-w-lg mx-auto p-4">
         <FeedHeader alias={alias} />
 
         {/* Tabs */}
         {hasLocation && (
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={() => setTab('feed')}
-              className={`badge-brutal text-sm font-bold cursor-pointer transition-all ${
-                tab === 'feed' ? 'bg-brutal-cyan border-[3px] shadow-brutal' : 'bg-white hover:bg-brutal-cyan/30'
-              }`}
-            >
-              📡 Feed
-            </button>
-            <button
-              onClick={() => setTab('mapa')}
-              className={`badge-brutal text-sm font-bold cursor-pointer transition-all ${
-                tab === 'mapa' ? 'bg-brutal-yellow border-[3px] shadow-brutal' : 'bg-white hover:bg-brutal-yellow/30'
-              }`}
-            >
-              🗺️ Mapa
-            </button>
-          </div>
+          <>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setTab('feed')}
+                className={`border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
+                  tab === 'feed'
+                    ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
+                    : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
+                }`}
+              >
+                📡 FEED
+              </button>
+              <button
+                onClick={() => setTab('mapa')}
+                className={`border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
+                  tab === 'mapa'
+                    ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
+                    : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
+                }`}
+              >
+                🗺️ MAPA
+              </button>
+            </div>
+
+            {/* CAMBIO 4: Zone filter chips */}
+            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide pb-1">
+              {ZONES.map(z => (
+                <button
+                  key={z}
+                  onClick={() => setZone(z)}
+                  className={`whitespace-nowrap flex-shrink-0 border-2 border-black px-3 py-1 font-extrabold text-xs transition-all duration-100 ${
+                    zone === z
+                      ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
+                      : 'bg-black/10 shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
+                  }`}
+                >
+                  {z}
+                </button>
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-4">
           {geoLoading ? (
-            <div className="card-brutal p-8 text-center animate-fade-in">
+            <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000] p-8 text-center animate-fade-in">
               <span className="text-4xl block mb-2">📍</span>
-              <p className="font-bold text-lg mb-1">Obteniendo tu ubicacion...</p>
-              <p className="text-foreground-secondary text-sm font-medium">
+              <p className="font-black text-lg mb-1 uppercase">Obteniendo tu ubicacion...</p>
+              <p className="font-medium text-sm text-gray-600">
                 Permite el acceso a tu ubicacion para ver shoutouts cerca de ti
               </p>
             </div>
           ) : geoError ? (
-            <div className="card-brutal p-8 text-center">
+            <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000] p-8 text-center">
               <span className="text-5xl block mb-3">🚫</span>
-              <p className="font-bold text-xl mb-2">Ubicacion no disponible</p>
-              <p className="text-foreground-secondary font-medium mb-4">
+              <p className="font-black text-xl mb-2 uppercase">Ubicacion no disponible</p>
+              <p className="font-medium text-gray-600 mb-4">
                 {geoError === 'PERMISSION_DENIED'
                   ? 'Necesitamos tu ubicacion para mostrar shoutouts cercanos. Activa la ubicacion en tu navegador.'
                   : 'No pudimos obtener tu ubicacion. Intenta de nuevo.'}
               </p>
               <button
                 onClick={refreshGeo}
-                className="btn-brutal bg-brutal-cyan"
+                className="bg-yellow-300 border-[2.5px] border-black shadow-[4px_4px_0_#000] px-6 py-3 font-black uppercase hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all duration-100"
               >
                 Reintentar
               </button>
