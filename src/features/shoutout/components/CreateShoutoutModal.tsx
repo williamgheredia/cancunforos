@@ -36,7 +36,7 @@ export function CreateShoutoutModal({ lat, lng, onCreated }: CreateShoutoutModal
     setIsOpen(true)
     setText('')
     setError(null)
-    setMode('text')
+    setMode('voice')
     voice.reset()
   }
 
@@ -109,20 +109,20 @@ export function CreateShoutoutModal({ lat, lng, onCreated }: CreateShoutoutModal
             {/* Mode toggle */}
             <div className="flex gap-2 mb-4">
               <button
-                onClick={() => { setMode('text'); voice.reset() }}
-                className={`badge-brutal text-xs font-bold cursor-pointer transition-all ${
-                  mode === 'text' ? 'bg-brutal-cyan border-[3px] shadow-brutal' : 'bg-white hover:bg-brutal-cyan/30'
-                }`}
-              >
-                ✏️ Texto
-              </button>
-              <button
                 onClick={() => { setMode('voice'); setText('') }}
                 className={`badge-brutal text-xs font-bold cursor-pointer transition-all ${
                   mode === 'voice' ? 'bg-brutal-orange border-[3px] shadow-brutal' : 'bg-white hover:bg-brutal-orange/30'
                 }`}
               >
                 🎙️ Voz
+              </button>
+              <button
+                onClick={() => { setMode('text'); voice.reset() }}
+                className={`badge-brutal text-xs font-bold cursor-pointer transition-all ${
+                  mode === 'text' ? 'bg-brutal-cyan border-[3px] shadow-brutal' : 'bg-white hover:bg-brutal-cyan/30'
+                }`}
+              >
+                ✏️ Texto
               </button>
             </div>
 
