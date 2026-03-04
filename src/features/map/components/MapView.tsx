@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
+import { useEffect, useState, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getActiveShoutouts, type ShoutoutRow } from '@/features/feed/actions/feed-actions'
@@ -127,21 +127,27 @@ function spotIcon(emoji: string): L.DivIcon {
   })
 }
 
-// Wrapper for grid cell markers with internal popup state
+// Close all popups when a shoutout is selected for overlay
+function ClosePopups({ trigger }: { trigger: unknown }) {
+  const map = useMap()
+  useEffect(() => {
+    if (trigger) map.closePopup()
+  }, [trigger, map])
+  return null
+}
+
+// Grid cell marker - popups only show list, clicks bubble up to parent
 function GridCellMarker({
   cell,
   userLat,
   userLng,
-  sessionId,
-  alias,
+  onSelectShoutout,
 }: {
   cell: GridCell
   userLat: number
   userLng: number
-  sessionId: string
-  alias: string
+  onSelectShoutout: (s: ShoutoutRow) => void
 }) {
-  const [selected, setSelected] = useState<ShoutoutRow | null>(null)
   const count = cell.shoutouts.length
   const isSingle = count === 1
 
@@ -149,40 +155,25 @@ function GridCellMarker({
     ? [cell.shoutouts[0].lat, cell.shoutouts[0].lng]
     : [cell.centerLat, cell.centerLng]
 
-  // Key forces Leaflet to re-create the popup when selection changes
-  const popupKey = selected ? `detail-${selected.id}` : 'list'
-
   return (
     <Marker
       position={position}
       icon={dotIcon(count, cell.topEmoji, cell.topCategory)}
-      eventHandlers={{
-        popupclose: () => setSelected(null),
-      }}
     >
-      <Popup key={popupKey}>
-        {selected ? (
-          <MapShoutoutDetail
-            shoutout={selected}
-            userLat={userLat}
-            userLng={userLng}
-            sessionId={sessionId}
-            alias={alias}
-            onBack={() => setSelected(null)}
-          />
-        ) : isSingle ? (
+      <Popup>
+        {isSingle ? (
           <SingleShoutoutPopup
             shoutout={cell.shoutouts[0]}
             userLat={userLat}
             userLng={userLng}
-            onSelect={() => setSelected(cell.shoutouts[0])}
+            onSelect={() => onSelectShoutout(cell.shoutouts[0])}
           />
         ) : (
           <ShoutoutListPopup
             shoutouts={cell.shoutouts}
             userLat={userLat}
             userLng={userLng}
-            onSelect={setSelected}
+            onSelect={onSelectShoutout}
           />
         )}
       </Popup>
@@ -265,6 +256,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
   const [shoutouts, setShoutouts] = useState<ShoutoutRow[]>([])
   const [spots, setSpots] = useState<SpotRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedShoutout, setSelectedShoutout] = useState<ShoutoutRow | null>(null)
   const { sessionId, alias } = useSessionStore()
 
   useEffect(() => {
@@ -325,76 +317,98 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
           }}
         />
       </div>
-      <div className="border-[2.5px] border-black shadow-[4px_4px_0_#000] overflow-hidden" style={{ height: '60vh' }}>
-      <MapContainer
-        center={[lat, lng]}
-        zoom={14}
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={false}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {/* User radius circle */}
-        <Circle
+      <div className="relative border-[2.5px] border-black shadow-[4px_4px_0_#000] overflow-hidden" style={{ height: '60vh' }}>
+        <MapContainer
           center={[lat, lng]}
-          radius={siteConfig.features.radiusKm * 1000}
-          pathOptions={{
-            color: '#000',
-            weight: 2,
-            fillColor: '#00D4FF',
-            fillOpacity: 0.08,
-          }}
-        />
-
-        {/* User position - cyan smiley, distinct from gold spots */}
-        <Marker
-          position={[lat, lng]}
-          icon={L.divIcon({
-            html: '<div style="font-size:20px;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#00D4FF;border:3px solid #000;box-shadow:3px 3px 0 #000;animation:pulse 2s infinite;">😊</div>',
-            iconSize: [38, 38],
-            iconAnchor: [19, 19],
-            className: '',
-          })}
+          zoom={14}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
         >
-          <Popup>
-            <strong>Tu ubicacion</strong>
-          </Popup>
-        </Marker>
-
-        {/* Shoutout grid cells as scaled dots */}
-        {gridCells.map(cell => (
-          <GridCellMarker
-            key={`grid-${cell.key}`}
-            cell={cell}
-            userLat={lat}
-            userLng={lng}
-            sessionId={sessionId}
-            alias={alias}
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-        ))}
 
-        {/* Spot markers (gold circles, fixed size) */}
-        {spots.map(sp => (
+          {/* Close popups when overlay opens */}
+          <ClosePopups trigger={selectedShoutout} />
+
+          {/* User radius circle */}
+          <Circle
+            center={[lat, lng]}
+            radius={siteConfig.features.radiusKm * 1000}
+            pathOptions={{
+              color: '#000',
+              weight: 2,
+              fillColor: '#00D4FF',
+              fillOpacity: 0.08,
+            }}
+          />
+
+          {/* User position - small cyan smiley, always on top */}
           <Marker
-            key={`sp-${sp.id}`}
-            position={[sp.lat, sp.lng]}
-            icon={spotIcon(sp.emoji)}
+            position={[lat, lng]}
+            zIndexOffset={1000}
+            icon={L.divIcon({
+              html: '<div style="font-size:10px;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#00D4FF;border:2px solid #000;box-shadow:2px 2px 0 #000;animation:pulse 2s infinite;">😊</div>',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+              className: '',
+            })}
           >
             <Popup>
-              <div style={{ minWidth: 180 }}>
-                <p style={{ fontWeight: 900, margin: '0 0 4px' }}>{sp.emoji} {sp.name}</p>
-                {sp.description && <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px' }}>{sp.description.slice(0, 80)}{sp.description.length > 80 ? '...' : ''}</p>}
-                <p style={{ fontSize: '11px', color: '#737373', margin: 0 }}>
-                  {sp.category} · {formatDistance(calculateDistance(lat, lng, sp.lat, sp.lng))}
-                </p>
-              </div>
+              <strong>Tu ubicacion</strong>
             </Popup>
           </Marker>
-        ))}
-      </MapContainer>
+
+          {/* Shoutout grid cells as scaled dots */}
+          {gridCells.map(cell => (
+            <GridCellMarker
+              key={`grid-${cell.key}`}
+              cell={cell}
+              userLat={lat}
+              userLng={lng}
+              onSelectShoutout={setSelectedShoutout}
+            />
+          ))}
+
+          {/* Spot markers (gold circles, fixed size) */}
+          {spots.map(sp => (
+            <Marker
+              key={`sp-${sp.id}`}
+              position={[sp.lat, sp.lng]}
+              icon={spotIcon(sp.emoji)}
+            >
+              <Popup>
+                <div style={{ minWidth: 180 }}>
+                  <p style={{ fontWeight: 900, margin: '0 0 4px' }}>{sp.emoji} {sp.name}</p>
+                  {sp.description && <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px' }}>{sp.description.slice(0, 80)}{sp.description.length > 80 ? '...' : ''}</p>}
+                  <p style={{ fontSize: '11px', color: '#737373', margin: 0 }}>
+                    {sp.category} · {formatDistance(calculateDistance(lat, lng, sp.lat, sp.lng))}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+
+        {/* Overlay panel for shoutout detail - renders OUTSIDE Leaflet */}
+        {selectedShoutout && (
+          <div
+            className="absolute inset-0 z-[1000] bg-white/95 overflow-y-auto animate-fade-in"
+            style={{ backdropFilter: 'blur(2px)' }}
+          >
+            <div className="p-4">
+              <MapShoutoutDetail
+                shoutout={selectedShoutout}
+                userLat={lat}
+                userLng={lng}
+                sessionId={sessionId}
+                alias={alias}
+                onBack={() => setSelectedShoutout(null)}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

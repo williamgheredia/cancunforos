@@ -9,13 +9,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
-    // Send to OpenRouter's OpenAI-compatible Whisper endpoint
     const whisperForm = new FormData()
     whisperForm.append('file', audio, 'audio.webm')
-    whisperForm.append('model', 'whisper-1')
+    whisperForm.append('model', 'openai/whisper-1')
     whisperForm.append('language', 'es')
 
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const response = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -24,29 +23,12 @@ export async function POST(request: Request) {
     })
 
     if (!response.ok) {
-      // Fallback: try OpenRouter endpoint
-      const orForm = new FormData()
-      orForm.append('file', audio, 'audio.webm')
-      orForm.append('model', 'openai/whisper-1')
-      orForm.append('language', 'es')
-
-      const orResponse = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        },
-        body: orForm,
-      })
-
-      if (!orResponse.ok) {
-        return NextResponse.json(
-          { error: 'Error al transcribir audio' },
-          { status: 500 }
-        )
-      }
-
-      const orData = await orResponse.json()
-      return NextResponse.json({ text: orData.text })
+      const errorText = await response.text().catch(() => 'Unknown error')
+      console.error('Transcription failed:', response.status, errorText)
+      return NextResponse.json(
+        { error: 'Error al transcribir audio' },
+        { status: 500 }
+      )
     }
 
     const data = await response.json()
