@@ -9,6 +9,8 @@ import { getActiveSpots, type SpotRow } from '../actions/map-actions'
 import { siteConfig } from '@/config/siteConfig'
 import { formatDistance, calculateDistance, getRelativeTime } from '@/shared/lib/geo-utils'
 import { CreateSpotModal } from '@/features/spots/components'
+import { useSessionStore } from '@/shared/stores/session-store'
+import { MapShoutoutDetail } from './MapShoutoutDetail'
 
 interface MapViewProps {
   lat: number
@@ -16,7 +18,7 @@ interface MapViewProps {
   onSpotCreated?: () => void
 }
 
-const CATEGORY_BG: Record<string, string> = {
+const CATEGORY_HEX: Record<string, string> = {
   alerta: '#f87171', trafico: '#fb923c', comida: '#a3e635',
   evento: '#67e8f9', clima: '#93c5fd', oferta: '#fde047',
   tip: '#c4b5fd', otro: '#e5e7eb',
@@ -48,11 +50,8 @@ function groupByGrid(shoutouts: ShoutoutRow[]): GridCell[] {
 
   const cells: GridCell[] = []
   for (const [key, items] of map) {
-    // Sort by confirms desc to find "top" shoutout
     const sorted = [...items].sort((a, b) => b.reactions_confirm - a.reactions_confirm)
     const top = sorted[0]
-
-    // Center of the grid cell
     const [gLatStr, gLngStr] = key.split('_')
     const gLat = parseInt(gLatStr)
     const gLng = parseInt(gLngStr)
@@ -70,56 +69,200 @@ function groupByGrid(shoutouts: ShoutoutRow[]): GridCell[] {
   return cells
 }
 
-function emojiIcon(emoji: string, isSpot = false): L.DivIcon {
-  return L.divIcon({
-    html: `<div style="
-      font-size: 24px;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: ${isSpot ? '#FFE500' : '#fff'};
-      border: 3px solid #000;
-      box-shadow: 2px 2px 0 #000;
-    ">${emoji}</div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -24],
-    className: '',
-  })
+function getDotSize(count: number): { size: number; fontSize: number } {
+  if (count <= 1) return { size: 32, fontSize: 16 }
+  if (count <= 3) return { size: 40, fontSize: 13 }
+  if (count <= 6) return { size: 50, fontSize: 15 }
+  if (count <= 10) return { size: 60, fontSize: 17 }
+  return { size: 70, fontSize: 19 } // CAP
 }
 
-function bubbleIcon(count: number, emoji: string, category: string): L.DivIcon {
-  const bg = CATEGORY_BG[category.toLowerCase()] ?? '#e5e7eb'
+function dotIcon(count: number, emoji: string, category: string): L.DivIcon {
+  const bg = CATEGORY_HEX[category.toLowerCase()] ?? '#e5e7eb'
+  const { size, fontSize } = getDotSize(count)
+  const half = size / 2
+  const label = count === 1 ? emoji : `${emoji}${count}`
+
   return L.divIcon({
     html: `<div style="
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       background: ${bg};
       border: 3px solid #000;
       box-shadow: 3px 3px 0 #000;
-      padding: 4px 10px;
       font-family: 'Space Grotesk', system-ui, sans-serif;
-      line-height: 1.2;
-      min-width: 52px;
-    ">
-      <span style="font-size:14px;font-weight:900;">${emoji} ${count}</span>
-      <span style="font-size:9px;font-weight:800;text-transform:uppercase;opacity:0.7;">${category}</span>
-    </div>`,
-    iconSize: [60, 44],
-    iconAnchor: [30, 22],
-    popupAnchor: [0, -26],
+      font-weight: 900;
+      font-size: ${fontSize}px;
+      line-height: 1;
+    ">${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half - 4],
     className: '',
   })
+}
+
+function spotIcon(emoji: string): L.DivIcon {
+  return L.divIcon({
+    html: `<div style="
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFE500;
+      border: 3px solid #000;
+      box-shadow: 2px 2px 0 #000;
+    ">${emoji}</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -22],
+    className: '',
+  })
+}
+
+// Wrapper for grid cell markers with internal popup state
+function GridCellMarker({
+  cell,
+  userLat,
+  userLng,
+  sessionId,
+  alias,
+}: {
+  cell: GridCell
+  userLat: number
+  userLng: number
+  sessionId: string
+  alias: string
+}) {
+  const [selected, setSelected] = useState<ShoutoutRow | null>(null)
+  const count = cell.shoutouts.length
+  const isSingle = count === 1
+
+  const position: [number, number] = isSingle
+    ? [cell.shoutouts[0].lat, cell.shoutouts[0].lng]
+    : [cell.centerLat, cell.centerLng]
+
+  return (
+    <Marker
+      position={position}
+      icon={dotIcon(count, cell.topEmoji, cell.topCategory)}
+      eventHandlers={{
+        popupclose: () => setSelected(null),
+      }}
+    >
+      <Popup>
+        {selected ? (
+          <MapShoutoutDetail
+            shoutout={selected}
+            userLat={userLat}
+            userLng={userLng}
+            sessionId={sessionId}
+            alias={alias}
+            onBack={() => setSelected(null)}
+          />
+        ) : isSingle ? (
+          <SingleShoutoutPopup
+            shoutout={cell.shoutouts[0]}
+            userLat={userLat}
+            userLng={userLng}
+            onSelect={() => setSelected(cell.shoutouts[0])}
+          />
+        ) : (
+          <ShoutoutListPopup
+            shoutouts={cell.shoutouts}
+            userLat={userLat}
+            userLng={userLng}
+            onSelect={setSelected}
+          />
+        )}
+      </Popup>
+    </Marker>
+  )
+}
+
+function SingleShoutoutPopup({
+  shoutout,
+  userLat,
+  userLng,
+  onSelect,
+}: {
+  shoutout: ShoutoutRow
+  userLat: number
+  userLng: number
+  onSelect: () => void
+}) {
+  const s = shoutout
+  return (
+    <div
+      style={{ minWidth: 200, cursor: 'pointer' }}
+      onClick={onSelect}
+    >
+      <p style={{ fontWeight: 900, margin: '0 0 4px', fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+        {s.emoji} {s.summary}
+      </p>
+      <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px', fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+        {s.text.slice(0, 80)}{s.text.length > 80 ? '...' : ''}
+      </p>
+      <p style={{ fontSize: '11px', color: '#737373', margin: '0 0 4px', fontFamily: "'Space Grotesk', system-ui, sans-serif", fontWeight: 700 }}>
+        {s.category} · {formatDistance(calculateDistance(userLat, userLng, s.lat, s.lng))} · {getRelativeTime(s.created_at)}
+      </p>
+      <p style={{ fontSize: '10px', color: '#000', fontWeight: 900, margin: 0, fontFamily: "'Space Grotesk', system-ui, sans-serif", textTransform: 'uppercase' }}>
+        Tap para abrir →
+      </p>
+    </div>
+  )
+}
+
+function ShoutoutListPopup({
+  shoutouts,
+  userLat,
+  userLng,
+  onSelect,
+}: {
+  shoutouts: ShoutoutRow[]
+  userLat: number
+  userLng: number
+  onSelect: (s: ShoutoutRow) => void
+}) {
+  return (
+    <div style={{ minWidth: 220, maxHeight: 240, overflowY: 'auto' }}>
+      <p style={{ fontWeight: 900, margin: '0 0 6px', fontSize: '13px', textTransform: 'uppercase', fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+        {shoutouts.length} shoutouts
+      </p>
+      {shoutouts.map(s => (
+        <div
+          key={s.id}
+          onClick={() => onSelect(s)}
+          style={{
+            borderBottom: '1px solid #e5e7eb',
+            padding: '6px 0',
+            cursor: 'pointer',
+          }}
+        >
+          <p style={{ fontWeight: 800, fontSize: '12px', margin: 0, fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+            {s.emoji} {s.summary}
+          </p>
+          <p style={{ fontSize: '10px', color: '#737373', margin: '2px 0 0', fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+            {s.category} · {formatDistance(calculateDistance(userLat, userLng, s.lat, s.lng))} · ✅{s.reactions_confirm}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
   const [shoutouts, setShoutouts] = useState<ShoutoutRow[]>([])
   const [spots, setSpots] = useState<SpotRow[]>([])
   const [loading, setLoading] = useState(true)
+  const { sessionId, alias } = useSessionStore()
 
   useEffect(() => {
     async function fetchData() {
@@ -207,7 +350,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
         <Marker
           position={[lat, lng]}
           icon={L.divIcon({
-            html: '<div style="font-size:20px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#facc15;border:3px solid #000;box-shadow:2px 2px 0 #000;">📍</div>',
+            html: '<div style="font-size:18px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#facc15;border:3px solid #000;box-shadow:2px 2px 0 #000;">📍</div>',
             iconSize: [32, 32],
             iconAnchor: [16, 16],
             className: '',
@@ -218,64 +361,24 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
           </Popup>
         </Marker>
 
-        {/* Shoutout grid cells */}
-        {gridCells.map(cell => {
-          if (cell.shoutouts.length === 1) {
-            // Single shoutout: show emoji pin
-            const s = cell.shoutouts[0]
-            return (
-              <Marker
-                key={`s-${s.id}`}
-                position={[s.lat, s.lng]}
-                icon={emojiIcon(s.emoji)}
-              >
-                <Popup>
-                  <div style={{ minWidth: 180 }}>
-                    <p style={{ fontWeight: 900, margin: '0 0 4px' }}>{s.emoji} {s.summary}</p>
-                    <p style={{ fontSize: '12px', color: '#404040', margin: '0 0 4px' }}>{s.text.slice(0, 80)}{s.text.length > 80 ? '...' : ''}</p>
-                    <p style={{ fontSize: '11px', color: '#737373', margin: 0 }}>
-                      {s.category} · {formatDistance(calculateDistance(lat, lng, s.lat, s.lng))} · {getRelativeTime(s.created_at)}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          }
+        {/* Shoutout grid cells as scaled dots */}
+        {gridCells.map(cell => (
+          <GridCellMarker
+            key={`grid-${cell.key}`}
+            cell={cell}
+            userLat={lat}
+            userLng={lng}
+            sessionId={sessionId}
+            alias={alias}
+          />
+        ))}
 
-          // Multiple shoutouts: show bubble with count
-          return (
-            <Marker
-              key={`grid-${cell.key}`}
-              position={[cell.centerLat, cell.centerLng]}
-              icon={bubbleIcon(cell.shoutouts.length, cell.topEmoji, cell.topCategory)}
-            >
-              <Popup>
-                <div style={{ minWidth: 200, maxHeight: 200, overflowY: 'auto' }}>
-                  <p style={{ fontWeight: 900, margin: '0 0 6px', fontSize: '13px', textTransform: 'uppercase' }}>
-                    {cell.shoutouts.length} shoutouts
-                  </p>
-                  {cell.shoutouts.map(s => (
-                    <div key={s.id} style={{ borderBottom: '1px solid #e5e7eb', padding: '4px 0' }}>
-                      <p style={{ fontWeight: 800, fontSize: '12px', margin: 0 }}>
-                        {s.emoji} {s.summary}
-                      </p>
-                      <p style={{ fontSize: '10px', color: '#737373', margin: '2px 0 0' }}>
-                        {s.category} · {formatDistance(calculateDistance(lat, lng, s.lat, s.lng))} · ✅{s.reactions_confirm}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </Popup>
-            </Marker>
-          )
-        })}
-
-        {/* Spot markers (gold, NOT grouped) */}
+        {/* Spot markers (gold circles, fixed size) */}
         {spots.map(sp => (
           <Marker
             key={`sp-${sp.id}`}
             position={[sp.lat, sp.lng]}
-            icon={emojiIcon(sp.emoji, true)}
+            icon={spotIcon(sp.emoji)}
           >
             <Popup>
               <div style={{ minWidth: 180 }}>
