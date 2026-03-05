@@ -1,19 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import dynamic from 'next/dynamic'
 import { getNearbyPeople, type PersonRow } from '@/features/people/actions/people-actions'
 import { calculateDistance, formatDistance } from '@/shared/lib/geo-utils'
 import { AdBanner } from './AdBanner'
-
-const MapView = dynamic(
-  () => import('@/features/map/components/MapView').then(m => ({ default: m.MapView })),
-  { ssr: false, loading: () => (
-    <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000] p-4 text-center">
-      <p className="font-black text-xs uppercase">Cargando mapa...</p>
-    </div>
-  )}
-)
 
 interface DesktopSidebarProps {
   lat: number
@@ -120,17 +110,6 @@ export function DesktopSidebar({ lat, lng, sessionId, onSendInbox }: DesktopSide
         )}
       </div>
 
-      {/* Mini map - compact, no spot button */}
-      <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000]">
-        <div className="bg-cyan-300 border-b-[2.5px] border-black px-3 py-2">
-          <span className="font-black text-xs uppercase">
-            🗺️ MAPA
-          </span>
-        </div>
-        <div className="h-[200px]">
-          <MapView lat={lat} lng={lng} hideSpotButton />
-        </div>
-      </div>
     </div>
   )
 }
