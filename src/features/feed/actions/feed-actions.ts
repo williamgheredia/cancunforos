@@ -24,7 +24,7 @@ export interface ShoutoutRow {
   expires_at: string
 }
 
-export type FeedSort = 'newest' | 'oldest' | 'top'
+export type FeedSort = 'newest' | 'oldest' | 'top' | 'promos'
 
 export interface PaginatedShoutouts {
   data: ShoutoutRow[]

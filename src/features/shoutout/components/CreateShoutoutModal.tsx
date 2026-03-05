@@ -156,6 +156,10 @@ export function CreateShoutoutModal({ lat, lng, onCreated, forceOpen, onForceOpe
                     autoFocus
                   />
 
+                  <p className="text-[11px] font-medium text-gray-400 mt-1">
+                    💡 Promocionas un negocio? Menciona su nombre y detalles para aparecer en el filtro PROMOS
+                  </p>
+
                   <div className="flex items-center justify-between mt-2 mb-4">
                     <span className={`text-xs font-black ${isOverLimit ? 'text-red-500' : 'text-gray-400'}`}>
                       {charCount}/{MAX_CHARS}

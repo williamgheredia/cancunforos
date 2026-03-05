@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { useSessionStore } from '@/shared/stores/session-store'
 import { useGeolocation } from '@/shared/hooks/use-geolocation'
 import { FeedHeader, FeedList, TopShoutouts } from '@/features/feed/components'
-import { PromoList } from '@/features/feed/components/PromoList'
 import { CreateShoutoutModal } from '@/features/shoutout/components'
 import { InboxView } from '@/features/inbox/components'
 import { ProfileView } from '@/features/profile/components/ProfileView'
@@ -26,7 +25,7 @@ const MapView = dynamic(
   )}
 )
 
-type Tab = 'feed' | 'mapa' | 'shoutouts' | 'promos' | 'inbox'
+type Tab = 'feed' | 'mapa' | 'shoutouts' | 'inbox'
 
 export default function HomePage() {
   const { alias, sessionId, initSession } = useSessionStore()
@@ -97,21 +96,12 @@ export default function HomePage() {
     setTab(t)
   }
 
-  const tabStyle = (t: Tab) => {
-    const isActive = tab === t && !showProfile
-    if (t === 'promos') {
-      return `border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
-        isActive
-          ? 'bg-red-500 text-white translate-x-[2px] translate-y-[2px]'
-          : 'bg-red-100 text-red-700 shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
-      }`
-    }
-    return `border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
-      isActive
+  const tabStyle = (t: Tab) =>
+    `border-2 border-black px-3 py-1 font-black text-sm uppercase transition-all duration-100 ${
+      tab === t && !showProfile
         ? 'bg-black text-yellow-300 translate-x-[2px] translate-y-[2px]'
         : 'bg-white shadow-[3px_3px_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_#000]'
     }`
-  }
 
   return (
     <main className="min-h-screen bg-[#f0ede6]">
@@ -127,9 +117,6 @@ export default function HomePage() {
             <button onClick={() => switchTab('shoutouts')} className={tabStyle('shoutouts')}>
               🔥 TOP
             </button>
-            <button onClick={() => switchTab('promos')} className={tabStyle('promos')}>
-              📣 PROMOS
-            </button>
             <button onClick={() => switchTab('mapa')} className={tabStyle('mapa')}>
               🗺️ MAPA
             </button>
@@ -144,7 +131,7 @@ export default function HomePage() {
           </div>
         )}
 
-        <div className={`mt-4 ${hasLocation && (tab === 'feed' || tab === 'shoutouts' || tab === 'promos') && !showProfile ? 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6' : ''}`}>
+        <div className={`mt-4 ${hasLocation && (tab === 'feed' || tab === 'shoutouts') && !showProfile ? 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6' : ''}`}>
           <div>
             {geoLoading ? (
               <div className="border-[2.5px] border-black bg-white shadow-[4px_4px_0_#000] p-8 text-center animate-fade-in">
@@ -190,8 +177,6 @@ export default function HomePage() {
               />
             ) : tab === 'shoutouts' ? (
               <TopShoutouts lat={lat!} lng={lng!} />
-            ) : tab === 'promos' ? (
-              <PromoList lat={lat!} lng={lng!} onViewOnMap={handleViewOnMap} />
             ) : tab === 'inbox' ? (
               <InboxView lat={lat!} lng={lng!} openChatWith={inboxTarget} />
             ) : (
@@ -200,7 +185,7 @@ export default function HomePage() {
           </div>
 
           {/* Desktop sidebar - only visible on lg: when feed or top tabs are active */}
-          {hasLocation && (tab === 'feed' || tab === 'shoutouts' || tab === 'promos') && !showProfile && (
+          {hasLocation && (tab === 'feed' || tab === 'shoutouts') && !showProfile && (
             <div className="hidden lg:block">
               <DesktopSidebar
                 lat={lat!}

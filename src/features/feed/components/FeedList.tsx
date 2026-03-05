@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { getActiveShoutouts, getMyShoutouts, type ShoutoutRow, type FeedSort } from '../actions/feed-actions'
+import { getActiveShoutouts, getPromoShoutouts, getMyShoutouts, type ShoutoutRow, type FeedSort } from '../actions/feed-actions'
 import { getUserReactions } from '../actions/reaction-actions'
 import { ShoutoutCard } from './ShoutoutCard'
 import { useSessionStore } from '@/shared/stores/session-store'
@@ -22,6 +22,7 @@ const SORT_OPTIONS: { key: FeedSort; label: string }[] = [
   { key: 'newest', label: 'NUEVOS' },
   { key: 'top', label: 'TOP' },
   { key: 'oldest', label: 'ANTIGUOS' },
+  { key: 'promos', label: '📣 PROMOS' },
 ]
 
 const RANGE_OPTIONS = [
@@ -59,7 +60,9 @@ export function FeedList({ lat, lng, myShoutoutsMode, onExitMyShoutouts, onViewO
           setReactions(userReactions)
         }
       } else {
-        const result = await getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, sortBy, PAGE_SIZE, 0)
+        const result = sortBy === 'promos'
+          ? await getPromoShoutouts(lat, lng, siteConfig.features.radiusKm, PAGE_SIZE, 0)
+          : await getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, sortBy, PAGE_SIZE, 0)
         setShoutouts(result.data)
         setHasMore(result.hasMore)
         if (sessionId && result.data.length > 0) {
@@ -80,7 +83,9 @@ export function FeedList({ lat, lng, myShoutoutsMode, onExitMyShoutouts, onViewO
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
-      const result = await getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, sortBy, PAGE_SIZE, shoutouts.length)
+      const result = sortBy === 'promos'
+        ? await getPromoShoutouts(lat, lng, siteConfig.features.radiusKm, PAGE_SIZE, shoutouts.length)
+        : await getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, sortBy, PAGE_SIZE, shoutouts.length)
       const newShoutouts = [...shoutouts, ...result.data]
       setShoutouts(newShoutouts)
       setHasMore(result.hasMore)
@@ -268,19 +273,27 @@ export function FeedList({ lat, lng, myShoutoutsMode, onExitMyShoutouts, onViewO
       {/* Sort filters (only in normal mode) */}
       {!myShoutoutsMode && (
         <div className="flex gap-2 mb-3">
-          {SORT_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => setSortBy(opt.key)}
-              className={`border-2 border-black px-2 py-0.5 font-black text-xs uppercase transition-all duration-100 ${
-                sortBy === opt.key
-                  ? 'bg-black text-yellow-300 translate-x-[1px] translate-y-[1px]'
-                  : 'bg-white shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {SORT_OPTIONS.map(opt => {
+            const isActive = sortBy === opt.key
+            const isPromo = opt.key === 'promos'
+            return (
+              <button
+                key={opt.key}
+                onClick={() => setSortBy(opt.key)}
+                className={`border-2 border-black px-2 py-0.5 font-black text-xs uppercase transition-all duration-100 ${
+                  isActive
+                    ? isPromo
+                      ? 'bg-red-500 text-white translate-x-[1px] translate-y-[1px]'
+                      : 'bg-black text-yellow-300 translate-x-[1px] translate-y-[1px]'
+                    : isPromo
+                      ? 'bg-red-100 text-red-700 shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
+                      : 'bg-white shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
       )}
 
