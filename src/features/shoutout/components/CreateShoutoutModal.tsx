@@ -59,16 +59,27 @@ export function CreateShoutoutModal({ lat, lng, onCreated, forceOpen, onForceOpe
     }
   }
 
+  function getFreshLocation(): Promise<{ lat: number; lng: number }> {
+    return new Promise(resolve => {
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve({ lat, lng }), // fallback to props
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      )
+    })
+  }
+
   function handleSubmit(source: 'text' | 'voice') {
     const submitText = source === 'voice' ? voice.transcription! : text.trim()
     if (!submitText) return
 
     startTransition(async () => {
       setError(null)
+      const freshCoords = await getFreshLocation()
       const result = await createShoutout({
         text: submitText,
-        lat,
-        lng,
+        lat: freshCoords.lat,
+        lng: freshCoords.lng,
         sessionId,
         alias,
         source,

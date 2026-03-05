@@ -20,6 +20,25 @@ export async function createShoutout(input: {
 
   const { text, lat, lng, sessionId, alias, source } = parsed.data
 
+  // Rate limit: 1 shoutout every 15 minutes per session
+  const supabase = await createClient()
+  const { data: lastShoutout } = await supabase
+    .from('shoutouts')
+    .select('created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (lastShoutout?.created_at) {
+    const elapsed = Date.now() - new Date(lastShoutout.created_at).getTime()
+    const cooldownMs = 15 * 60 * 1000
+    if (elapsed < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - elapsed) / 60_000)
+      return { error: `Espera ${remaining} minuto${remaining > 1 ? 's' : ''} para publicar otro shoutout.` }
+    }
+  }
+
   // Classify with AI + moderation
   const { classification, blocked, isPromo } = await classifyShoutout(text)
 
@@ -32,7 +51,6 @@ export async function createShoutout(input: {
     Date.now() + siteConfig.features.shoutoutTTLHours * 60 * 60 * 1000
   ).toISOString()
 
-  const supabase = await createClient()
   const { error } = await supabase.from('shoutouts').insert({
     session_id: sessionId,
     alias,
