@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { useSessionStore } from '@/shared/stores/session-store'
 import { useGeolocation } from '@/shared/hooks/use-geolocation'
@@ -51,14 +51,22 @@ export default function HomePage() {
     }
   }, [sessionId, alias, lat, lng])
 
-  // Poll unread count every 60s + fetch rank
+  // Poll unread count every 15s + fetch rank + vibrate on new messages
+  const prevUnreadRef = useRef(-1)
   useEffect(() => {
     if (!sessionId) return
     const fetchUnread = () => {
-      getUnreadCount(sessionId).then(setUnreadCount).catch(() => {})
+      getUnreadCount(sessionId).then(count => {
+        if (count > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+          // Vibrate on new messages (double pulse)
+          navigator.vibrate?.([200, 100, 200])
+        }
+        prevUnreadRef.current = count
+        setUnreadCount(count)
+      }).catch(() => {})
     }
     fetchUnread()
-    const interval = setInterval(fetchUnread, 60_000)
+    const interval = setInterval(fetchUnread, 15_000)
 
     // Fetch rank badge
     getShoutoutCount(sessionId).then(count => {
