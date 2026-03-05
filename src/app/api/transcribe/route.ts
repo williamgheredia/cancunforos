@@ -9,6 +9,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
+    // Reject tiny blobs (likely silence or no speech)
+    if (audio.size < 5000) {
+      return NextResponse.json(
+        { error: 'No se detecto voz. Intenta grabar de nuevo hablando claramente.' },
+        { status: 400 }
+      )
+    }
+
     // Convert audio to base64
     const arrayBuffer = await audio.arrayBuffer()
     const base64Audio = Buffer.from(arrayBuffer).toString('base64')
@@ -28,7 +36,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: 'text',
-                text: 'Transcribe este audio en español. Solo devuelve el texto transcrito, sin explicaciones, sin comillas, sin formato adicional.',
+                text: 'Transcribe este audio en español. Solo devuelve el texto transcrito, sin explicaciones, sin comillas, sin formato adicional. Si el audio esta en silencio, no contiene voz humana clara, o solo tiene ruido de fondo, responde EXACTAMENTE con la palabra: SILENCIO',
               },
               {
                 type: 'input_audio',
@@ -55,10 +63,10 @@ export async function POST(request: Request) {
     const data = await response.json()
     const text = data.choices?.[0]?.message?.content?.trim() ?? ''
 
-    if (!text) {
+    if (!text || text === 'SILENCIO' || text.length < 3) {
       return NextResponse.json(
-        { error: 'No se pudo transcribir el audio' },
-        { status: 500 }
+        { error: 'No se detecto voz clara. Habla mas fuerte o acerca el microfono.' },
+        { status: 400 }
       )
     }
 

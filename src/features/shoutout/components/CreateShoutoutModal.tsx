@@ -140,8 +140,11 @@ export function CreateShoutoutModal({ lat, lng, onCreated, forceOpen, onForceOpe
               </div>
 
               {/* Alias */}
-              <p className="text-xs text-gray-500 font-extrabold mb-3">
+              <p className="text-xs text-gray-500 font-extrabold mb-1">
                 Publicando como <span className="font-black text-black">{alias}</span>
+              </p>
+              <p className="text-[11px] font-medium text-gray-400 mb-3">
+                💡 Promocionas un negocio? Menciona su nombre y detalles para aparecer en el filtro PROMOS
               </p>
 
               {mode === 'text' ? (
@@ -155,10 +158,6 @@ export function CreateShoutoutModal({ lat, lng, onCreated, forceOpen, onForceOpe
                     disabled={isPending}
                     autoFocus
                   />
-
-                  <p className="text-[11px] font-medium text-gray-400 mt-1">
-                    💡 Promocionas un negocio? Menciona su nombre y detalles para aparecer en el filtro PROMOS
-                  </p>
 
                   <div className="flex items-center justify-between mt-2 mb-4">
                     <span className={`text-xs font-black ${isOverLimit ? 'text-red-500' : 'text-gray-400'}`}>

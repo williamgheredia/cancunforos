@@ -107,6 +107,14 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         chunksRef.current = []
 
+        // Reject tiny blobs (likely silence)
+        if (blob.size < 5000) {
+          setError('No se detecto voz. Habla mas fuerte e intenta de nuevo.')
+          setState('idle')
+          resolve()
+          return
+        }
+
         // Send to transcription API
         try {
           const formData = new FormData()
