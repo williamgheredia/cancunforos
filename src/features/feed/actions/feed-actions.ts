@@ -23,15 +23,25 @@ export interface ShoutoutRow {
   expires_at: string
 }
 
+export type FeedSort = 'newest' | 'oldest' | 'top'
+
+export interface PaginatedShoutouts {
+  data: ShoutoutRow[]
+  hasMore: boolean
+}
+
 export async function getActiveShoutouts(
   lat: number,
   lng: number,
-  radiusKm: number
-): Promise<ShoutoutRow[]> {
+  radiusKm: number,
+  sortBy: FeedSort = 'newest',
+  limit: number = 12,
+  offset: number = 0
+): Promise<PaginatedShoutouts> {
   const supabase = await createClient()
   const { latDelta, lngDelta } = getBoundingBox(lat, radiusKm)
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('shoutouts')
     .select('*')
     .gt('expires_at', new Date().toISOString())
@@ -40,7 +50,32 @@ export async function getActiveShoutouts(
     .lte('lat', lat + latDelta)
     .gte('lng', lng - lngDelta)
     .lte('lng', lng + lngDelta)
-    .order('reactions_confirm', { ascending: false })
+
+  if (sortBy === 'top') {
+    query = query.order('reactions_confirm', { ascending: false }).order('created_at', { ascending: false })
+  } else if (sortBy === 'oldest') {
+    query = query.order('created_at', { ascending: true })
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
+
+  // Fetch one extra to detect if there are more
+  const { data, error } = await query.range(offset, offset + limit)
+
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as ShoutoutRow[]
+  // Supabase range is inclusive, so range(0, 12) returns 13 rows max
+  const hasMore = rows.length > limit
+  return { data: hasMore ? rows.slice(0, limit) : rows, hasMore }
+}
+
+export async function getMyShoutouts(sessionId: string): Promise<ShoutoutRow[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('shoutouts')
+    .select('*')
+    .eq('session_id', sessionId)
     .order('created_at', { ascending: false })
     .limit(50)
 

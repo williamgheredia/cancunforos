@@ -16,8 +16,18 @@ export const createShoutoutSchema = z.object({
 
 export const classificationSchema = z.object({
   category: z.enum([
-    'trafico', 'clima', 'oferta', 'alerta',
-    'tip', 'comida', 'evento', 'otro',
+    // Locales (30)
+    'trafico', 'clima', 'oferta', 'seguridad', 'emergencia',
+    'tip', 'comida', 'evento', 'fiesta', 'salud',
+    'deporte', 'servicios', 'empleo', 'inmuebles', 'mascotas',
+    'transporte', 'cultura', 'social', 'educacion', 'compraventa',
+    'gobierno', 'tecnologia', 'naturaleza', 'comunidad', 'perdido',
+    'denuncia', 'ninos', 'belleza', 'religion', 'humor',
+    // Turismo (20)
+    'playa', 'hotel', 'tour', 'cenote', 'arqueologia',
+    'vuelo', 'snorkel', 'compras', 'fotografia', 'alojamiento',
+    'cambio', 'wifi', 'isla', 'vida_nocturna', 'gastronomia',
+    'aventura', 'moda', 'legal', 'jardineria', 'otro',
   ]),
   emoji: z.string().min(1).max(4),
   summary: z.string().min(1).max(100),

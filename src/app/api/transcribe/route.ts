@@ -9,17 +9,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
-    const whisperForm = new FormData()
-    whisperForm.append('file', audio, 'audio.webm')
-    whisperForm.append('model', 'openai/whisper-1')
-    whisperForm.append('language', 'es')
+    // Convert audio to base64
+    const arrayBuffer = await audio.arrayBuffer()
+    const base64Audio = Buffer.from(arrayBuffer).toString('base64')
 
-    const response = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
+    // Use OpenRouter chat/completions with multimodal audio input
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
       },
-      body: whisperForm,
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Transcribe este audio en español. Solo devuelve el texto transcrito, sin explicaciones, sin comillas, sin formato adicional.',
+              },
+              {
+                type: 'input_audio',
+                input_audio: {
+                  data: base64Audio,
+                  format: 'webm',
+                },
+              },
+            ],
+          },
+        ],
+      }),
     })
 
     if (!response.ok) {
@@ -32,7 +53,16 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json()
-    return NextResponse.json({ text: data.text })
+    const text = data.choices?.[0]?.message?.content?.trim() ?? ''
+
+    if (!text) {
+      return NextResponse.json(
+        { error: 'No se pudo transcribir el audio' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ text })
   } catch {
     return NextResponse.json(
       { error: 'Error al procesar audio' },

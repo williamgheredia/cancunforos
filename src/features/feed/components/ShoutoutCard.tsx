@@ -15,14 +15,57 @@ const REPORT_REASONS = [
 ]
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  alerta:  { bg: 'bg-red-400', text: 'text-white' },
-  trafico: { bg: 'bg-orange-400', text: 'text-black' },
-  comida:  { bg: 'bg-lime-400', text: 'text-black' },
-  evento:  { bg: 'bg-cyan-300', text: 'text-black' },
-  clima:   { bg: 'bg-blue-300', text: 'text-black' },
-  oferta:  { bg: 'bg-yellow-300', text: 'text-black' },
-  tip:     { bg: 'bg-violet-300', text: 'text-black' },
-  otro:    { bg: 'bg-gray-200', text: 'text-black' },
+  trafico:       { bg: 'bg-orange-400', text: 'text-black' },
+  clima:         { bg: 'bg-blue-300', text: 'text-black' },
+  oferta:        { bg: 'bg-yellow-300', text: 'text-black' },
+  seguridad:     { bg: 'bg-red-400', text: 'text-white' },
+  emergencia:    { bg: 'bg-red-600', text: 'text-white' },
+  tip:           { bg: 'bg-violet-300', text: 'text-black' },
+  comida:        { bg: 'bg-lime-400', text: 'text-black' },
+  evento:        { bg: 'bg-cyan-300', text: 'text-black' },
+  fiesta:        { bg: 'bg-pink-400', text: 'text-black' },
+  salud:         { bg: 'bg-rose-300', text: 'text-black' },
+  deporte:       { bg: 'bg-emerald-400', text: 'text-black' },
+  servicios:     { bg: 'bg-slate-300', text: 'text-black' },
+  empleo:        { bg: 'bg-indigo-300', text: 'text-black' },
+  inmuebles:     { bg: 'bg-teal-300', text: 'text-black' },
+  mascotas:      { bg: 'bg-amber-200', text: 'text-black' },
+  transporte:    { bg: 'bg-sky-300', text: 'text-black' },
+  cultura:       { bg: 'bg-purple-300', text: 'text-black' },
+  social:        { bg: 'bg-fuchsia-300', text: 'text-black' },
+  educacion:     { bg: 'bg-blue-200', text: 'text-black' },
+  compraventa:   { bg: 'bg-orange-300', text: 'text-black' },
+  gobierno:      { bg: 'bg-stone-300', text: 'text-black' },
+  tecnologia:    { bg: 'bg-gray-400', text: 'text-black' },
+  naturaleza:    { bg: 'bg-green-300', text: 'text-black' },
+  comunidad:     { bg: 'bg-neutral-300', text: 'text-black' },
+  perdido:       { bg: 'bg-yellow-200', text: 'text-black' },
+  denuncia:      { bg: 'bg-red-300', text: 'text-black' },
+  ninos:         { bg: 'bg-pink-200', text: 'text-black' },
+  belleza:       { bg: 'bg-fuchsia-200', text: 'text-black' },
+  religion:      { bg: 'bg-amber-100', text: 'text-black' },
+  humor:         { bg: 'bg-yellow-400', text: 'text-black' },
+  playa:         { bg: 'bg-amber-300', text: 'text-black' },
+  hotel:         { bg: 'bg-indigo-200', text: 'text-black' },
+  tour:          { bg: 'bg-teal-200', text: 'text-black' },
+  cenote:        { bg: 'bg-cyan-200', text: 'text-black' },
+  arqueologia:   { bg: 'bg-stone-400', text: 'text-white' },
+  vuelo:         { bg: 'bg-sky-200', text: 'text-black' },
+  snorkel:       { bg: 'bg-blue-400', text: 'text-white' },
+  compras:       { bg: 'bg-pink-300', text: 'text-black' },
+  fotografia:    { bg: 'bg-rose-200', text: 'text-black' },
+  alojamiento:   { bg: 'bg-violet-200', text: 'text-black' },
+  cambio:        { bg: 'bg-green-200', text: 'text-black' },
+  wifi:          { bg: 'bg-gray-300', text: 'text-black' },
+  isla:          { bg: 'bg-emerald-200', text: 'text-black' },
+  vida_nocturna: { bg: 'bg-slate-400', text: 'text-white' },
+  gastronomia:   { bg: 'bg-orange-200', text: 'text-black' },
+  aventura:      { bg: 'bg-emerald-300', text: 'text-black' },
+  moda:          { bg: 'bg-fuchsia-100', text: 'text-black' },
+  legal:         { bg: 'bg-zinc-300', text: 'text-black' },
+  jardineria:    { bg: 'bg-green-400', text: 'text-black' },
+  otro:          { bg: 'bg-gray-200', text: 'text-black' },
+  alerta:        { bg: 'bg-red-400', text: 'text-white' },
 }
 
 function getCategoryStyle(category: string) {
@@ -36,9 +79,10 @@ interface ShoutoutCardProps {
   sessionId: string
   alias: string
   userReaction?: 'confirm' | 'doubt' | null
+  onViewOnMap?: (shoutout: ShoutoutRow) => void
 }
 
-export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, userReaction }: ShoutoutCardProps) {
+export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, userReaction, onViewOnMap }: ShoutoutCardProps) {
   const distance = calculateDistance(userLat, userLng, shoutout.lat, shoutout.lng)
   const [expanded, setExpanded] = useState(false)
   const [confirm, setConfirm] = useState(shoutout.reactions_confirm)
@@ -164,8 +208,16 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, use
               <p className="font-medium text-sm text-gray-600 whitespace-pre-wrap">{shoutout.text}</p>
             )}
 
-            {/* Report */}
-            <div className="flex justify-end mt-2" onClick={e => e.stopPropagation()}>
+            {/* Actions row */}
+            <div className="flex justify-end gap-2 mt-2" onClick={e => e.stopPropagation()}>
+              {onViewOnMap && (
+                <button
+                  onClick={() => onViewOnMap(shoutout)}
+                  className="bg-cyan-300 border-2 border-black px-2 py-0.5 font-extrabold text-xs shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000] transition-all duration-100"
+                >
+                  🗺️ VER EN MAPA
+                </button>
+              )}
               {!reported ? (
                 <button
                   onClick={() => setShowReport(!showReport)}

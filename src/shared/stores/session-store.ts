@@ -9,6 +9,7 @@ interface SessionState {
   alias: string
   aliasCreatedAt: number
   initSession: () => void
+  restoreSession: (sessionId: string, alias: string) => void
 }
 
 function generateSessionId(): string {
@@ -28,15 +29,21 @@ export const useSessionStore = create<SessionState>()(
         const state = get()
         const now = Date.now()
 
-        // Generate session_id if missing
         const sessionId = state.sessionId || generateSessionId()
 
-        // Regenerate alias if missing or expired (24h privacy)
         const aliasExpired = now - state.aliasCreatedAt > ALIAS_TTL_MS
         const alias = !state.alias || aliasExpired ? generateAlias() : state.alias
         const aliasCreatedAt = aliasExpired ? now : state.aliasCreatedAt
 
         set({ sessionId, alias, aliasCreatedAt })
+      },
+
+      restoreSession: (sessionId: string, alias: string) => {
+        set({
+          sessionId,
+          alias: alias || generateAlias(),
+          aliasCreatedAt: Date.now(),
+        })
       },
     }),
     {

@@ -47,3 +47,14 @@ export interface AdminStats {
   activeSpots: number
   inactiveSpots: number
 }
+
+export interface Banner {
+  id: string
+  title: string
+  image_url: string
+  link_url: string | null
+  is_active: boolean
+  position: string
+  priority: number
+  created_at: string
+}

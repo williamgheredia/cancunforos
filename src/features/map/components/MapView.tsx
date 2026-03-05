@@ -16,12 +16,28 @@ interface MapViewProps {
   lat: number
   lng: number
   onSpotCreated?: () => void
+  focusShoutout?: ShoutoutRow | null
+  hideSpotButton?: boolean
 }
 
 const CATEGORY_HEX: Record<string, string> = {
-  alerta: '#f87171', trafico: '#fb923c', comida: '#a3e635',
-  evento: '#67e8f9', clima: '#93c5fd', oferta: '#fde047',
-  tip: '#c4b5fd', otro: '#e5e7eb',
+  trafico: '#fb923c', clima: '#93c5fd', oferta: '#fde047',
+  seguridad: '#f87171', emergencia: '#dc2626', tip: '#c4b5fd',
+  comida: '#a3e635', evento: '#67e8f9', fiesta: '#f472b6',
+  salud: '#fda4af', deporte: '#34d399', servicios: '#cbd5e1',
+  empleo: '#a5b4fc', inmuebles: '#5eead4', mascotas: '#fde68a',
+  transporte: '#7dd3fc', cultura: '#d8b4fe', social: '#f0abfc',
+  educacion: '#bfdbfe', compraventa: '#fdba74', gobierno: '#d6d3d1',
+  tecnologia: '#9ca3af', naturaleza: '#86efac', comunidad: '#d4d4d4',
+  perdido: '#fef08a', denuncia: '#fca5a5', ninos: '#fbcfe8',
+  belleza: '#f5d0fe', religion: '#fef3c7', humor: '#facc15',
+  playa: '#fcd34d', hotel: '#c7d2fe', tour: '#99f6e4',
+  cenote: '#a5f3fc', arqueologia: '#a8a29e', vuelo: '#bae6fd',
+  snorkel: '#60a5fa', compras: '#f9a8d4', fotografia: '#fecdd3',
+  alojamiento: '#ddd6fe', cambio: '#bbf7d0', wifi: '#d1d5db',
+  isla: '#a7f3d0', vida_nocturna: '#94a3b8', gastronomia: '#fed7aa',
+  aventura: '#6ee7b7', moda: '#fae8ff', legal: '#d4d4d8',
+  jardineria: '#4ade80', otro: '#e5e7eb', alerta: '#f87171',
 }
 
 interface GridCell {
@@ -143,6 +159,15 @@ function ClosePopups({ trigger }: { trigger: unknown }) {
   return null
 }
 
+// Fly to a specific location
+function FlyTo({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
+  const map = useMap()
+  useEffect(() => {
+    map.flyTo([lat, lng], zoom ?? 17, { duration: 1 })
+  }, [map, lat, lng, zoom])
+  return null
+}
+
 // Grid cell marker - popups only show list, clicks bubble up to parent
 function GridCellMarker({
   cell,
@@ -259,7 +284,7 @@ function ShoutoutListPopup({
   )
 }
 
-export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
+export function MapView({ lat, lng, onSpotCreated, focusShoutout, hideSpotButton }: MapViewProps) {
   const [shoutouts, setShoutouts] = useState<ShoutoutRow[]>([])
   const [spots, setSpots] = useState<SpotRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -271,7 +296,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
       setLoading(true)
       try {
         const [shoutoutData, spotData] = await Promise.all([
-          getActiveShoutouts(lat, lng, siteConfig.features.radiusKm),
+          getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, 'newest', 50).then(r => r.data),
           getActiveSpots(lat, lng, siteConfig.features.radiusKm),
         ])
         setShoutouts(shoutoutData)
@@ -289,7 +314,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
     async function fetchData() {
       try {
         const [shoutoutData, spotData] = await Promise.all([
-          getActiveShoutouts(lat, lng, siteConfig.features.radiusKm),
+          getActiveShoutouts(lat, lng, siteConfig.features.radiusKm, 'newest', 50).then(r => r.data),
           getActiveSpots(lat, lng, siteConfig.features.radiusKm),
         ])
         setShoutouts(shoutoutData)
@@ -314,17 +339,19 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <CreateSpotModal
-          lat={lat}
-          lng={lng}
-          onCreated={() => {
-            refetch()
-            onSpotCreated?.()
-          }}
-        />
-      </div>
-      <div className="relative border-[2.5px] border-black shadow-[4px_4px_0_#000] overflow-hidden" style={{ height: '60vh' }}>
+      {!hideSpotButton && (
+        <div className="flex justify-end">
+          <CreateSpotModal
+            lat={lat}
+            lng={lng}
+            onCreated={() => {
+              refetch()
+              onSpotCreated?.()
+            }}
+          />
+        </div>
+      )}
+      <div className="relative border-[2.5px] border-black shadow-[4px_4px_0_#000] overflow-hidden h-[60vh] md:h-[75vh]">
         <MapContainer
           center={[lat, lng]}
           zoom={14}
@@ -338,6 +365,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
 
           {/* Close popups when overlay opens */}
           <ClosePopups trigger={selectedShoutout} />
+          {focusShoutout && <FlyTo lat={focusShoutout.lat} lng={focusShoutout.lng} />}
 
           {/* User radius circle */}
           <Circle

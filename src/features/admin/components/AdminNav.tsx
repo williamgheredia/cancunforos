@@ -9,6 +9,7 @@ export function AdminNav({ currentPath }: AdminNavProps) {
   const links = [
     { href: '/admin', label: 'Shoutouts', emoji: '📢' },
     { href: '/admin/spots', label: 'Spots', emoji: '📍' },
+    { href: '/admin/banners', label: 'Banners', emoji: '📣' },
   ]
 
   return (

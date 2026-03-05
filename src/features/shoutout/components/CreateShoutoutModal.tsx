@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useSessionStore } from '@/shared/stores/session-store'
 import { createShoutout } from '../actions/create-shoutout'
 import { useVoiceRecorder } from '../hooks/use-voice-recorder'
@@ -10,6 +10,8 @@ interface CreateShoutoutModalProps {
   lat: number
   lng: number
   onCreated: () => void
+  forceOpen?: boolean
+  onForceOpenConsumed?: () => void
 }
 
 const MAX_CHARS = siteConfig.features.textMaxChars
@@ -17,7 +19,7 @@ const MIN_VOICE_SECONDS = siteConfig.features.voiceMinSeconds
 
 type InputMode = 'text' | 'voice'
 
-export function CreateShoutoutModal({ lat, lng, onCreated }: CreateShoutoutModalProps) {
+export function CreateShoutoutModal({ lat, lng, onCreated, forceOpen, onForceOpenConsumed }: CreateShoutoutModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [mode, setMode] = useState<InputMode>('voice')
   const [text, setText] = useState('')
@@ -26,6 +28,14 @@ export function CreateShoutoutModal({ lat, lng, onCreated }: CreateShoutoutModal
   const { sessionId, alias } = useSessionStore()
 
   const voice = useVoiceRecorder()
+
+  // Open modal programmatically from outside
+  useEffect(() => {
+    if (forceOpen && !isOpen) {
+      handleOpen()
+      onForceOpenConsumed?.()
+    }
+  }, [forceOpen])
 
   const charCount = text.length
   const isOverLimit = charCount > MAX_CHARS
