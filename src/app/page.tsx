@@ -6,6 +6,8 @@ import { useSessionStore } from '@/shared/stores/session-store'
 import { useGeolocation } from '@/shared/hooks/use-geolocation'
 import { FeedHeader, FeedList, TopShoutouts } from '@/features/feed/components'
 import { CreateShoutoutModal } from '@/features/shoutout/components'
+import { PeopleList } from '@/features/people/components'
+import { upsertPresence } from '@/features/people/actions/people-actions'
 
 const MapView = dynamic(
   () => import('@/features/map/components/MapView').then(m => ({ default: m.MapView })),
@@ -17,10 +19,10 @@ const MapView = dynamic(
   )}
 )
 
-type Tab = 'feed' | 'mapa' | 'shoutouts'
+type Tab = 'feed' | 'mapa' | 'shoutouts' | 'personas'
 
 export default function HomePage() {
-  const { alias, initSession } = useSessionStore()
+  const { alias, sessionId, initSession } = useSessionStore()
   const { lat, lng, loading: geoLoading, error: geoError, refresh: refreshGeo } = useGeolocation()
   const [feedKey, setFeedKey] = useState(0)
   const [tab, setTab] = useState<Tab>('feed')
@@ -28,6 +30,13 @@ export default function HomePage() {
   useEffect(() => {
     initSession()
   }, [initSession])
+
+  // Update presence when location is available
+  useEffect(() => {
+    if (sessionId && lat && lng) {
+      upsertPresence(sessionId, alias, lat, lng)
+    }
+  }, [sessionId, alias, lat, lng])
 
   const hasLocation = !geoLoading && !geoError && lat && lng
 
@@ -50,7 +59,10 @@ export default function HomePage() {
               📡 FEED
             </button>
             <button onClick={() => setTab('shoutouts')} className={tabStyle('shoutouts')}>
-              🔥 SHOUTOUTS
+              🔥 TOP
+            </button>
+            <button onClick={() => setTab('personas')} className={tabStyle('personas')}>
+              👤 PERSONAS
             </button>
             <button onClick={() => setTab('mapa')} className={tabStyle('mapa')}>
               🗺️ MAPA
@@ -88,9 +100,12 @@ export default function HomePage() {
               key={feedKey}
               lat={lat!}
               lng={lng!}
+              onGoToPersonas={() => setTab('personas')}
             />
           ) : tab === 'shoutouts' ? (
             <TopShoutouts lat={lat!} lng={lng!} />
+          ) : tab === 'personas' ? (
+            <PeopleList lat={lat!} lng={lng!} />
           ) : (
             <MapView lat={lat!} lng={lng!} />
           )}

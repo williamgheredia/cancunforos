@@ -19,22 +19,24 @@ export async function classifySpot(name: string, description: string): Promise<S
       schema: spotClassificationSchema,
       prompt: `Eres un clasificador de negocios/lugares para una comunidad hiperlocal en Cancun, Mexico.
 
-Clasifica el siguiente lugar en UNA categoria con un emoji representativo.
+Clasifica el siguiente lugar en UNA categoria y elige el emoji MAS ESPECIFICO posible.
 
-Categorias disponibles:
-- restaurante: restaurantes, cafeterias, bares, puestos de comida
-- tienda: tiendas, supermercados, farmacias, comercios
-- servicio: mecanicos, plomeros, salones de belleza, lavanderia
-- entretenimiento: cines, parques, discotecas, playas, cenotes
-- salud: hospitales, clinicas, consultorios, dentistas
-- educacion: escuelas, universidades, cursos, talleres
-- transporte: estaciones, paradas, rentas de autos
-- otro: cualquier cosa que no encaje
+Categorias y emojis sugeridos:
+- restaurante: 🍽️ restaurante, 🍕 pizzeria, 🍣 sushi, 🌮 tacos, ☕ cafe, 🍺 bar, 🍔 hamburguesas, 🍦 helados, 🥐 panaderia
+- tienda: 🛒 super, 💊 farmacia, 👗 ropa, 📱 tecnologia, 🛍️ tienda, 🏪 abarrotes, 🐾 mascotas, 🔨 ferreteria
+- servicio: 🔧 mecanico, ✂️ salon belleza, 👔 lavanderia, 🏨 hotel, 💈 barberia, 🧹 limpieza, 📦 paqueteria, ⛽ gasolinera
+- entretenimiento: 🎬 cine, 🏖️ playa, 🌳 parque, 🪩 disco, 🎮 arcade, 💪 gym, 🏊 alberca, 🎭 teatro, 🎳 boliche
+- salud: 🏥 hospital, 🦷 dentista, 👁️ optica, 🧠 psicologo, 💉 laboratorio, 🩺 clinica
+- educacion: 🎓 universidad, 📚 escuela, 🎨 taller arte, 💻 coworking, 📖 libreria
+- transporte: 🚌 parada bus, 🚕 taxi, 🚗 renta autos, ✈️ aeropuerto, ⛽ gasolinera
+- otro: 📍 si no encaja en ninguna
+
+IMPORTANTE: Elige el emoji que MEJOR represente el lugar especifico, no uno generico.
 
 Nombre: "${name}"
 Descripcion: "${description}"
 
-Responde con la categoria y un emoji representativo.`,
+Responde con la categoria y el emoji mas representativo.`,
     })
 
     return object

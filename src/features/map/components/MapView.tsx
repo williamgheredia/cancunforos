@@ -77,11 +77,11 @@ function getDotSize(count: number): { size: number; fontSize: number } {
   return { size: 70, fontSize: 19 } // CAP
 }
 
-function dotIcon(count: number, emoji: string, category: string): L.DivIcon {
+function dotIcon(count: number, _emoji: string, category: string): L.DivIcon {
   const bg = CATEGORY_HEX[category.toLowerCase()] ?? '#e5e7eb'
   const { size, fontSize } = getDotSize(count)
   const half = size / 2
-  const label = count === 1 ? emoji : `${emoji}${count}`
+  const label = count === 1 ? '📢' : `📢${count}`
 
   return L.divIcon({
     html: `<div style="
@@ -106,7 +106,14 @@ function dotIcon(count: number, emoji: string, category: string): L.DivIcon {
   })
 }
 
-function spotIcon(emoji: string): L.DivIcon {
+const SPOT_CATEGORY_HEX: Record<string, string> = {
+  restaurante: '#f87171', tienda: '#fde047', servicio: '#93c5fd',
+  entretenimiento: '#c4b5fd', salud: '#86efac', educacion: '#67e8f9',
+  transporte: '#fb923c', otro: '#e5e7eb',
+}
+
+function spotIcon(emoji: string, category: string): L.DivIcon {
+  const bg = SPOT_CATEGORY_HEX[category.toLowerCase()] ?? '#FFE500'
   return L.divIcon({
     html: `<div style="
       font-size: 18px;
@@ -116,7 +123,7 @@ function spotIcon(emoji: string): L.DivIcon {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #FFE500;
+      background: ${bg};
       border: 3px solid #000;
       box-shadow: 2px 2px 0 #000;
     ">${emoji}</div>`,
@@ -376,7 +383,7 @@ export function MapView({ lat, lng, onSpotCreated }: MapViewProps) {
             <Marker
               key={`sp-${sp.id}`}
               position={[sp.lat, sp.lng]}
-              icon={spotIcon(sp.emoji)}
+              icon={spotIcon(sp.emoji, sp.category)}
             >
               <Popup>
                 <div style={{ minWidth: 180 }}>
