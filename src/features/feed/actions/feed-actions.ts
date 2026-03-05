@@ -19,6 +19,7 @@ export interface ShoutoutRow {
   reports_count: number
   is_collapsed: boolean
   comments_count: number
+  is_promo: boolean
   created_at: string
   expires_at: string
 }
@@ -118,4 +119,33 @@ export async function getTopShoutouts(
     const dist = Math.sqrt(dLat * dLat + dLng * dLng)
     return dist >= minKm
   })
+}
+
+export async function getPromoShoutouts(
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  limit: number = 12,
+  offset: number = 0
+): Promise<PaginatedShoutouts> {
+  const supabase = await createClient()
+  const { latDelta, lngDelta } = getBoundingBox(lat, radiusKm)
+
+  const { data, error } = await supabase
+    .from('shoutouts')
+    .select('*')
+    .eq('is_promo', true)
+    .eq('is_collapsed', false)
+    .gt('expires_at', new Date().toISOString())
+    .gte('lat', lat - latDelta)
+    .lte('lat', lat + latDelta)
+    .gte('lng', lng - lngDelta)
+    .lte('lng', lng + lngDelta)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit)
+
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as ShoutoutRow[]
+  const hasMore = rows.length > limit
+  return { data: hasMore ? rows.slice(0, limit) : rows, hasMore }
 }

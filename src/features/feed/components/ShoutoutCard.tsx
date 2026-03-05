@@ -138,12 +138,15 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, use
     })
   }
 
+  const isPromo = shoutout.is_promo
+
   return (
-    <div className="shoutout-card animate-slide-up relative">
+    <div className={`shoutout-card animate-slide-up relative ${isPromo ? 'border-red-500 ring-2 ring-red-300' : ''}`}>
       {/* Category color strip */}
-      <div className={`${catStyle.bg} border-b-[2.5px] border-black px-3 py-1 flex items-center justify-between`}>
-        <span className={`font-black text-xs flex items-center gap-2 uppercase ${catStyle.text}`}>
-          {shoutout.emoji} {shoutout.category}
+      <div className={`${isPromo ? 'bg-red-500' : catStyle.bg} border-b-[2.5px] border-black px-3 py-1 flex items-center justify-between`}>
+        <span className={`font-black text-xs flex items-center gap-2 uppercase ${isPromo ? 'text-white' : catStyle.text}`}>
+          {isPromo ? '📣' : shoutout.emoji} {isPromo ? 'PROMO' : shoutout.category}
+          {isPromo && <span className="bg-white text-red-600 px-1.5 py-0.5 text-[10px] font-black rounded-sm">B2C</span>}
           <span className="font-medium normal-case">
             {shoutout.source === 'voice' ? '🎙️' : '✏️'}
           </span>

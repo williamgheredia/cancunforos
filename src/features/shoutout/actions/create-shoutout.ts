@@ -21,7 +21,7 @@ export async function createShoutout(input: {
   const { text, lat, lng, sessionId, alias, source } = parsed.data
 
   // Classify with AI + moderation
-  const { classification, blocked } = await classifyShoutout(text)
+  const { classification, blocked, isPromo } = await classifyShoutout(text)
 
   if (blocked) {
     return { error: 'Tu shoutout no pudo ser publicado porque contiene contenido no permitido.' }
@@ -44,6 +44,7 @@ export async function createShoutout(input: {
     lat,
     lng,
     expires_at: expiresAt,
+    is_promo: isPromo,
   })
 
   if (error) {

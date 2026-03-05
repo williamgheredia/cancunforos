@@ -113,7 +113,7 @@ function classifyWithKeywords(text: string): Classification {
   }
 }
 
-function parseAIResponse(response: string): { classification: Classification; safe: boolean } | null {
+function parseAIResponse(response: string): { classification: Classification; safe: boolean; isPromo: boolean } | null {
   const cleaned = response.trim()
   const parts = cleaned.split('|')
 
@@ -122,22 +122,29 @@ function parseAIResponse(response: string): { classification: Classification; sa
   const safeStr = parts[0].trim().toUpperCase()
   const category = parts[1].trim().toLowerCase() as Category
   const emoji = parts[2].trim()
-  const summary = parts.slice(3).join('|').trim()
+
+  // Check if last part is promo indicator (YES/NO)
+  const lastPart = parts[parts.length - 1].trim().toUpperCase()
+  const hasPromoField = lastPart === 'YES' || lastPart === 'NO'
+  const isPromo = lastPart === 'YES'
+
+  const summaryParts = hasPromoField ? parts.slice(3, -1) : parts.slice(3)
+  const summary = summaryParts.join('|').trim()
 
   const safe = safeStr === 'SAFE'
 
   if (safeStr === 'BLOCKED') {
-    return { classification: { category: 'otro', emoji: '📢', summary: '' }, safe: false }
+    return { classification: { category: 'otro', emoji: '📢', summary: '' }, safe: false, isPromo: false }
   }
 
   if (!VALID_CATEGORIES.includes(category)) return null
   if (!emoji || emoji.length > 4) return null
   if (!summary) return null
 
-  return { classification: { category, emoji, summary }, safe }
+  return { classification: { category, emoji, summary }, safe, isPromo }
 }
 
-async function classifyAndModerateWithAI(text: string): Promise<{ classification: Classification; safe: boolean }> {
+async function classifyAndModerateWithAI(text: string): Promise<{ classification: Classification; safe: boolean; isPromo: boolean }> {
   const { text: response } = await generateText({
     model: openrouter('google/gemini-2.5-flash'),
     prompt: `Eres moderador y clasificador de una comunidad en Cancun, Mexico.
@@ -220,14 +227,26 @@ REGLAS:
 - planta/vivero/jardin → jardineria
 - SOLO usa "otro" si NINGUNA de las 49 categorias aplica
 
+PASO 3 - DETECCION DE PROMOCION B2C:
+Determina si el contenido es una PROMOCION COMERCIAL (B2C):
+- YES si menciona un NEGOCIO ESPECIFICO (restaurante, tienda, hotel, bar, etc.) con intencion promocional
+- YES si es publicidad comercial de un establecimiento
+- NO si es venta persona-a-persona (ej: "vendo mi bici")
+- NO si es una recomendacion personal sin intencion comercial
+- NO si solo menciona un lugar sin promocionar
+
 FORMATO DE RESPUESTA (una sola linea):
-Si es seguro: SAFE|CATEGORIA|EMOJI|RESUMEN
-Si es bloqueado: BLOCKED|otro|📢|bloqueado
+Si es seguro: SAFE|CATEGORIA|EMOJI|RESUMEN|PROMO
+Si es bloqueado: BLOCKED|otro|📢|bloqueado|NO
+
+Donde PROMO es YES o NO.
 
 Ejemplos:
-SAFE|trafico|🚗|Choque en la avenida Tulum
-SAFE|seguridad|🚨|Reportan asalto en SM28
-BLOCKED|otro|📢|bloqueado
+SAFE|trafico|🚗|Choque en la avenida Tulum|NO
+SAFE|oferta|💰|2x1 en margaritas en La Habichuela|YES
+SAFE|compraventa|🛒|Vendo mi bici usada en buen estado|NO
+SAFE|comida|🍽️|Nuevo menu de temporada en Porfirios|YES
+BLOCKED|otro|📢|bloqueado|NO
 
 Texto: "${text}"`,
   })
@@ -244,6 +263,7 @@ Texto: "${text}"`,
 export interface ClassificationResult {
   classification: Classification
   blocked: boolean
+  isPromo: boolean
 }
 
 export async function classifyShoutout(text: string): Promise<ClassificationResult> {
@@ -253,17 +273,18 @@ export async function classifyShoutout(text: string): Promise<ClassificationResu
     return {
       classification: { category: 'otro', emoji: '📢', summary: '' },
       blocked: true,
+      isPromo: false,
     }
   }
 
   // Layer 2: AI moderation + classification (single call)
   try {
-    const { classification, safe } = await classifyAndModerateWithAI(text)
+    const { classification, safe, isPromo } = await classifyAndModerateWithAI(text)
     if (!safe) {
       console.log('[classify-shoutout] BLOCKED by AI moderation')
-      return { classification, blocked: true }
+      return { classification, blocked: true, isPromo: false }
     }
-    return { classification, blocked: false }
+    return { classification, blocked: false, isPromo }
   } catch (error) {
     console.error('[classify-shoutout] AI failed:', error)
   }
@@ -271,5 +292,5 @@ export async function classifyShoutout(text: string): Promise<ClassificationResu
   // Layer 3: Keyword classification fallback (no moderation needed — already passed Layer 1)
   const keywordResult = classifyWithKeywords(text)
   console.log('[classify-shoutout] Using keyword fallback:', keywordResult.category)
-  return { classification: keywordResult, blocked: false }
+  return { classification: keywordResult, blocked: false, isPromo: false }
 }
