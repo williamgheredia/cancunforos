@@ -2,6 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isValidUUID(id: string): boolean { return UUID_RE.test(id) }
+
 export interface DirectMessage {
   id: string
   sender_session_id: string
@@ -23,6 +26,7 @@ export interface Conversation {
 }
 
 export async function getConversations(sessionId: string): Promise<Conversation[]> {
+  if (!isValidUUID(sessionId)) return []
   const supabase = await createClient()
 
   // Get all messages where user is sender or receiver
@@ -70,6 +74,7 @@ export async function getMessages(
   sessionId: string,
   otherSessionId: string
 ): Promise<DirectMessage[]> {
+  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId)) return []
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -92,6 +97,9 @@ export async function sendMessage(
   receiverAlias: string,
   text: string
 ): Promise<{ message?: DirectMessage; error?: string }> {
+  if (!isValidUUID(senderSessionId) || !isValidUUID(receiverSessionId)) {
+    return { error: 'Sesion invalida' }
+  }
   if (!text.trim() || text.length > 500) {
     return { error: 'Mensaje invalido' }
   }
@@ -115,6 +123,7 @@ export async function sendMessage(
 }
 
 export async function getUnreadCount(sessionId: string): Promise<number> {
+  if (!isValidUUID(sessionId)) return 0
   const supabase = await createClient()
 
   const { count, error } = await supabase
@@ -131,6 +140,7 @@ export async function markConversationRead(
   sessionId: string,
   otherSessionId: string
 ): Promise<void> {
+  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId)) return
   const supabase = await createClient()
 
   await supabase

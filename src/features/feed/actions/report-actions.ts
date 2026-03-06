@@ -37,19 +37,12 @@ export async function reportShoutout(
     return { error: 'Error al reportar' }
   }
 
-  // Increment reports_count
-  const { data: shoutout } = await supabase
-    .from('shoutouts')
-    .select('reports_count')
-    .eq('id', shoutoutId)
-    .single()
-
-  if (shoutout) {
-    await supabase
-      .from('shoutouts')
-      .update({ reports_count: shoutout.reports_count + 1 })
-      .eq('id', shoutoutId)
-  }
+  // Atomic increment reports_count
+  await supabase.rpc('increment_counter', {
+    row_id: shoutoutId,
+    table_name: 'shoutouts',
+    column_name: 'reports_count',
+  })
 
   return { success: true }
 }

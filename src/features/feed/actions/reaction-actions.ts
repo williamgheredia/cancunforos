@@ -50,10 +50,15 @@ export async function reactToShoutout(
 
     if (updateError) return { error: 'Error al cambiar reaccion' }
 
-    // Adjust counters: +1 new type, -1 old type
-    const confirmDelta = type === 'confirm' ? 1 : -1
-    const doubtDelta = type === 'doubt' ? 1 : -1
+    // Atomic adjust: +1 new type, -1 old type
+    const addCol = type === 'confirm' ? 'reactions_confirm' : 'reactions_doubt'
+    const subCol = type === 'confirm' ? 'reactions_doubt' : 'reactions_confirm'
+    await Promise.all([
+      supabase.rpc('increment_counter', { row_id: shoutoutId, table_name: 'shoutouts', column_name: addCol, amount: 1 }),
+      supabase.rpc('increment_counter', { row_id: shoutoutId, table_name: 'shoutouts', column_name: subCol, amount: -1 }),
+    ])
 
+    // Re-read for collapse check
     const { data: shoutout } = await supabase
       .from('shoutouts')
       .select('reactions_confirm, reactions_doubt')
@@ -62,12 +67,11 @@ export async function reactToShoutout(
 
     if (!shoutout) return { error: 'Shoutout no encontrado' }
 
-    const newConfirm = Math.max(0, shoutout.reactions_confirm + confirmDelta)
-    const newDoubt = Math.max(0, shoutout.reactions_doubt + doubtDelta)
+    const total = shoutout.reactions_confirm + shoutout.reactions_doubt
+    const shouldCollapse = total > 0 && shoutout.reactions_doubt / total >= siteConfig.features.collapseDoubtThreshold
+    await supabase.from('shoutouts').update({ is_collapsed: shouldCollapse }).eq('id', shoutoutId)
 
-    await updateShoutoutCounters(supabase, shoutoutId, newConfirm, newDoubt)
-
-    return { confirm: newConfirm, doubt: newDoubt, userReaction: type }
+    return { confirm: shoutout.reactions_confirm, doubt: shoutout.reactions_doubt, userReaction: type }
   }
 
   // New reaction
@@ -77,7 +81,15 @@ export async function reactToShoutout(
 
   if (insertError) return { error: 'Error al reaccionar' }
 
-  // Increment counter
+  // Atomic increment the appropriate counter
+  const col = type === 'confirm' ? 'reactions_confirm' : 'reactions_doubt'
+  await supabase.rpc('increment_counter', {
+    row_id: shoutoutId,
+    table_name: 'shoutouts',
+    column_name: col,
+  })
+
+  // Re-read to get accurate totals for collapse check
   const { data: shoutout } = await supabase
     .from('shoutouts')
     .select('reactions_confirm, reactions_doubt')
@@ -86,33 +98,14 @@ export async function reactToShoutout(
 
   if (!shoutout) return { error: 'Shoutout no encontrado' }
 
-  const newConfirm = shoutout.reactions_confirm + (type === 'confirm' ? 1 : 0)
-  const newDoubt = shoutout.reactions_doubt + (type === 'doubt' ? 1 : 0)
+  // Check collapse threshold
+  const total = shoutout.reactions_confirm + shoutout.reactions_doubt
+  const shouldCollapse = total > 0 && shoutout.reactions_doubt / total >= siteConfig.features.collapseDoubtThreshold
+  if (shouldCollapse) {
+    await supabase.from('shoutouts').update({ is_collapsed: true }).eq('id', shoutoutId)
+  }
 
-  await updateShoutoutCounters(supabase, shoutoutId, newConfirm, newDoubt)
-
-  return { confirm: newConfirm, doubt: newDoubt, userReaction: type }
-}
-
-async function updateShoutoutCounters(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  shoutoutId: string,
-  confirm: number,
-  doubt: number
-) {
-  const total = confirm + doubt
-  const shouldCollapse =
-    total > 0 &&
-    doubt / total >= siteConfig.features.collapseDoubtThreshold
-
-  await supabase
-    .from('shoutouts')
-    .update({
-      reactions_confirm: confirm,
-      reactions_doubt: doubt,
-      is_collapsed: shouldCollapse,
-    })
-    .eq('id', shoutoutId)
+  return { confirm: shoutout.reactions_confirm, doubt: shoutout.reactions_doubt, userReaction: type }
 }
 
 export async function getUserReactions(

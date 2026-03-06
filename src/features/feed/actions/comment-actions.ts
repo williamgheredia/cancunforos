@@ -54,17 +54,12 @@ export async function addComment(input: {
     return { error: 'Error al comentar. Intenta de nuevo.' }
   }
 
-  // Increment comments_count on shoutout (read + update pattern)
-  const { data: shoutout } = await supabase
-    .from('shoutouts')
-    .select('comments_count')
-    .eq('id', input.shoutoutId)
-    .single()
-
-  await supabase
-    .from('shoutouts')
-    .update({ comments_count: (shoutout?.comments_count ?? 0) + 1 })
-    .eq('id', input.shoutoutId)
+  // Atomic increment comments_count
+  await supabase.rpc('increment_counter', {
+    row_id: input.shoutoutId,
+    table_name: 'shoutouts',
+    column_name: 'comments_count',
+  })
 
   return { success: true, comment: data as CommentRow }
 }

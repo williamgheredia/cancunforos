@@ -4,8 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ReportedShoutout, Spot, AdminStats, Banner } from '../types'
 
-export async function getReportedShoutouts(): Promise<ReportedShoutout[]> {
+async function requireAdmin() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('No autorizado')
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (!profile || profile.role !== 'admin') throw new Error('No autorizado')
+  return supabase
+}
+
+export async function getReportedShoutouts(): Promise<ReportedShoutout[]> {
+  const supabase = await requireAdmin()
 
   const { data, error } = await supabase
     .from('shoutouts')
@@ -18,7 +31,7 @@ export async function getReportedShoutouts(): Promise<ReportedShoutout[]> {
 }
 
 export async function getAllShoutouts(): Promise<ReportedShoutout[]> {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { data, error } = await supabase
     .from('shoutouts')
@@ -31,7 +44,7 @@ export async function getAllShoutouts(): Promise<ReportedShoutout[]> {
 }
 
 export async function deleteShoutout(id: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { error } = await supabase
     .from('shoutouts')
@@ -43,7 +56,7 @@ export async function deleteShoutout(id: string) {
 }
 
 export async function collapseShoutout(id: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { error } = await supabase
     .from('shoutouts')
@@ -55,7 +68,7 @@ export async function collapseShoutout(id: string) {
 }
 
 export async function getSpots(): Promise<Spot[]> {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { data, error } = await supabase
     .from('spots')
@@ -67,7 +80,7 @@ export async function getSpots(): Promise<Spot[]> {
 }
 
 export async function toggleSpotActive(id: string, isActive: boolean) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { error } = await supabase
     .from('spots')
@@ -79,7 +92,7 @@ export async function toggleSpotActive(id: string, isActive: boolean) {
 }
 
 export async function deleteSpot(id: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const { error } = await supabase
     .from('spots')
@@ -93,7 +106,7 @@ export async function deleteSpot(id: string) {
 // --- Banner CRUD ---
 
 export async function getBanners(): Promise<Banner[]> {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
   const { data, error } = await supabase
     .from('banners')
     .select('*')
@@ -103,7 +116,7 @@ export async function getBanners(): Promise<Banner[]> {
 }
 
 export async function createBanner(input: { title: string; image_url: string; link_url?: string; position?: string }) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
   const { error } = await supabase.from('banners').insert({
     title: input.title,
     image_url: input.image_url,
@@ -115,7 +128,7 @@ export async function createBanner(input: { title: string; image_url: string; li
 }
 
 export async function toggleBanner(id: string, isActive: boolean) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
   const { error } = await supabase
     .from('banners')
     .update({ is_active: !isActive })
@@ -125,7 +138,7 @@ export async function toggleBanner(id: string, isActive: boolean) {
 }
 
 export async function deleteBanner(id: string) {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
   const { error } = await supabase.from('banners').delete().eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/admin/banners')
@@ -145,7 +158,7 @@ export async function getActiveBanners(position: string = 'sidebar'): Promise<Ba
 }
 
 export async function getStats(): Promise<AdminStats> {
-  const supabase = await createClient()
+  const supabase = await requireAdmin()
 
   const [shoutouts, spots] = await Promise.all([
     supabase.from('shoutouts').select('id, reports_count, is_collapsed', { count: 'exact' }),

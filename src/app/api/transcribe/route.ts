@@ -9,6 +9,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
+    // Reject files > 5MB (prevent abuse)
+    if (audio.size > 5_000_000) {
+      return NextResponse.json(
+        { error: 'Archivo muy grande. Maximo 5MB.' },
+        { status: 413 }
+      )
+    }
+
+    // Validate MIME type
+    if (!audio.type.startsWith('audio/')) {
+      return NextResponse.json(
+        { error: 'Formato no valido. Solo archivos de audio.' },
+        { status: 400 }
+      )
+    }
+
     // Reject tiny blobs (likely silence or no speech)
     if (audio.size < 5000) {
       return NextResponse.json(

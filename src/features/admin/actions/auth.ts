@@ -7,8 +7,15 @@ import { createClient } from '@/lib/supabase/server'
 export async function adminLogin(formData: FormData) {
   const supabase = await createClient()
 
-  const email = formData.get('email') as string
+  const email = (formData.get('email') as string)?.trim()
   const password = formData.get('password') as string
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Email invalido' }
+  }
+  if (!password || password.length < 6) {
+    return { error: 'Password debe tener al menos 6 caracteres' }
+  }
 
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
