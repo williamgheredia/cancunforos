@@ -9,10 +9,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
-    // Reject files > 5MB (prevent abuse)
-    if (audio.size > 5_000_000) {
+    // Reject files > 1MB (prevent abuse — normal 30s voice ~50KB)
+    if (audio.size > 1_000_000) {
       return NextResponse.json(
-        { error: 'Archivo muy grande. Maximo 5MB.' },
+        { error: 'Archivo muy grande. Maximo 1MB.' },
         { status: 413 }
       )
     }

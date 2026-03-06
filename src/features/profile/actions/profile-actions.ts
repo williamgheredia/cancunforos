@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function getShoutoutCount(sessionId: string): Promise<number> {
   const supabase = await createClient()
@@ -23,7 +23,8 @@ function generateCode(): string {
 }
 
 export async function getOrCreateRecoveryCode(sessionId: string): Promise<string | null> {
-  const supabase = await createClient()
+  // Use service client to bypass RLS (SELECT on recovery_codes is blocked for anon)
+  const supabase = createServiceClient()
 
   // Check if already has a code
   const { data: existing } = await supabase
@@ -93,25 +94,27 @@ export async function restoreSession(code: string): Promise<{ sessionId: string;
   if (hash.length !== 8) return null
 
   const supabase = await createClient()
-  const { data } = await supabase
-    .from('recovery_codes')
-    .select('session_id')
-    .eq('code_hash', hash)
-    .single()
 
-  if (!data) return null
+  // Use RPC to find session by code hash (SELECT on recovery_codes is blocked)
+  const { data, error } = await supabase.rpc('restore_session_by_code', {
+    p_code_hash: hash,
+  })
+
+  if (error || !data || data.length === 0) return null
+
+  const sessionId = data[0].session_id
 
   // Get the latest alias used by this session
   const { data: latestShoutout } = await supabase
     .from('shoutouts')
     .select('alias')
-    .eq('session_id', data.session_id)
+    .eq('session_id', sessionId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
 
   return {
-    sessionId: data.session_id,
+    sessionId,
     alias: latestShoutout?.alias ?? '',
   }
 }

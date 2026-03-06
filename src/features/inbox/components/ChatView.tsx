@@ -9,10 +9,11 @@ interface ChatViewProps {
   alias: string
   otherSessionId: string
   otherAlias: string
+  pin: string
   onBack: () => void
 }
 
-export function ChatView({ sessionId, alias, otherSessionId, otherAlias, onBack }: ChatViewProps) {
+export function ChatView({ sessionId, alias, otherSessionId, otherAlias, pin, onBack }: ChatViewProps) {
   const [messages, setMessages] = useState<DirectMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [text, setText] = useState('')
@@ -21,7 +22,7 @@ export function ChatView({ sessionId, alias, otherSessionId, otherAlias, onBack 
   const msgCountRef = useRef(0)
 
   const fetchMessages = useCallback(async () => {
-    const data = await getMessages(sessionId, otherSessionId)
+    const data = await getMessages(sessionId, otherSessionId, pin)
 
     // Check for new messages from the other person → vibrate
     const incomingCount = data.filter(m => m.sender_session_id === otherSessionId).length
@@ -32,17 +33,17 @@ export function ChatView({ sessionId, alias, otherSessionId, otherAlias, onBack 
 
     setMessages(data)
     msgCountRef.current = data.length
-    markConversationRead(sessionId, otherSessionId)
-  }, [sessionId, otherSessionId, messages])
+    markConversationRead(sessionId, otherSessionId, pin)
+  }, [sessionId, otherSessionId, pin, messages])
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const data = await getMessages(sessionId, otherSessionId)
+      const data = await getMessages(sessionId, otherSessionId, pin)
       setMessages(data)
       msgCountRef.current = data.length
       setLoading(false)
-      markConversationRead(sessionId, otherSessionId)
+      markConversationRead(sessionId, otherSessionId, pin)
     }
     load()
   }, [sessionId, otherSessionId])

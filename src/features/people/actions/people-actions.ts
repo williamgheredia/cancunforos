@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getBoundingBox } from '@/shared/lib/geo-utils'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface PersonRow {
   id: string
@@ -18,6 +19,10 @@ export async function upsertPresence(
   lat: number,
   lng: number
 ): Promise<void> {
+  if (!UUID_RE.test(sessionId)) return
+  if (!alias || alias.length > 30) return
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return
+
   const supabase = await createClient()
 
   await supabase
@@ -35,21 +40,13 @@ export async function getNearbyPeople(
   currentSessionId: string
 ): Promise<PersonRow[]> {
   const supabase = await createClient()
-  const { latDelta, lngDelta } = getBoundingBox(lat, radiusKm)
-  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
 
-  const { data, error } = await supabase
-    .from('presence')
-    .select('*')
-    .eq('is_visible', true)
-    .neq('session_id', currentSessionId)
-    .gte('last_seen', thirtyMinAgo)
-    .gte('lat', lat - latDelta)
-    .lte('lat', lat + latDelta)
-    .gte('lng', lng - lngDelta)
-    .lte('lng', lng + lngDelta)
-    .order('last_seen', { ascending: false })
-    .limit(50)
+  const { data, error } = await supabase.rpc('get_nearby_people', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_km: radiusKm,
+    p_current_session_id: currentSessionId,
+  })
 
   if (error) return []
   return (data ?? []) as PersonRow[]
@@ -62,20 +59,14 @@ export async function getNearbyPeopleCount(
   currentSessionId: string
 ): Promise<number> {
   const supabase = await createClient()
-  const { latDelta, lngDelta } = getBoundingBox(lat, radiusKm)
-  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
 
-  const { count, error } = await supabase
-    .from('presence')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_visible', true)
-    .neq('session_id', currentSessionId)
-    .gte('last_seen', thirtyMinAgo)
-    .gte('lat', lat - latDelta)
-    .lte('lat', lat + latDelta)
-    .gte('lng', lng - lngDelta)
-    .lte('lng', lng + lngDelta)
+  const { data, error } = await supabase.rpc('get_nearby_people_count', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_km: radiusKm,
+    p_current_session_id: currentSessionId,
+  })
 
   if (error) return 0
-  return count ?? 0
+  return data ?? 0
 }

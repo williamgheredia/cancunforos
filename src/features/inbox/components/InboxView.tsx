@@ -8,6 +8,7 @@ import { siteConfig } from '@/config/siteConfig'
 import { formatDistance, calculateDistance } from '@/shared/lib/geo-utils'
 import { ConversationList } from './ConversationList'
 import { ChatView } from './ChatView'
+import { PinGate, usePinStore } from './PinGate'
 
 interface InboxViewProps {
   lat: number
@@ -18,6 +19,20 @@ interface InboxViewProps {
 type View = 'list' | 'chat' | 'people'
 
 export function InboxView({ lat, lng, openChatWith }: InboxViewProps) {
+  const [pin, setPin] = useState<string | null>(null)
+
+  return (
+    <PinGate onPinReady={setPin}>
+      {pin && <InboxContent lat={lat} lng={lng} openChatWith={openChatWith} pin={pin} />}
+    </PinGate>
+  )
+}
+
+interface InboxContentProps extends InboxViewProps {
+  pin: string
+}
+
+function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
   const [view, setView] = useState<View>(openChatWith ? 'chat' : 'list')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [people, setPeople] = useState<PersonRow[]>([])
@@ -38,7 +53,7 @@ export function InboxView({ lat, lng, openChatWith }: InboxViewProps) {
     if (!sessionId) return
     setLoading(true)
     try {
-      const data = await getConversations(sessionId)
+      const data = await getConversations(sessionId, pin)
       // Check if new unreads arrived → vibrate
       const totalUnread = data.reduce((sum, c) => sum + c.unreadCount, 0)
       if (totalUnread > prevUnreadRef.current && prevUnreadRef.current > 0) {
@@ -51,7 +66,7 @@ export function InboxView({ lat, lng, openChatWith }: InboxViewProps) {
     } finally {
       setLoading(false)
     }
-  }, [sessionId])
+  }, [sessionId, pin])
 
   useEffect(() => {
     fetchConversations()
@@ -99,6 +114,7 @@ export function InboxView({ lat, lng, openChatWith }: InboxViewProps) {
         alias={alias}
         otherSessionId={chatTarget.sessionId}
         otherAlias={chatTarget.alias}
+        pin={pin}
         onBack={handleBackFromChat}
       />
     )

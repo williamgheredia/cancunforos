@@ -56,7 +56,9 @@ export default function HomePage() {
   useEffect(() => {
     if (!sessionId) return
     const fetchUnread = () => {
-      getUnreadCount(sessionId).then(count => {
+      const pin = sessionStorage.getItem('cancunforos-inbox-pin')
+      if (!pin) return // Can't check unreads without PIN
+      getUnreadCount(sessionId, pin).then(count => {
         if (count > prevUnreadRef.current && prevUnreadRef.current >= 0) {
           // Vibrate on new messages (double pulse)
           navigator.vibrate?.([200, 100, 200])

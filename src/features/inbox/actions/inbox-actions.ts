@@ -25,66 +25,47 @@ export interface Conversation {
   isSender: boolean
 }
 
-export async function getConversations(sessionId: string): Promise<Conversation[]> {
-  if (!isValidUUID(sessionId)) return []
+export async function getConversations(sessionId: string, pin: string): Promise<Conversation[]> {
+  if (!isValidUUID(sessionId) || !pin) return []
   const supabase = await createClient()
 
-  // Get all messages where user is sender or receiver
-  const { data, error } = await supabase
-    .from('direct_messages')
-    .select('*')
-    .or(`sender_session_id.eq.${sessionId},receiver_session_id.eq.${sessionId}`)
-    .order('created_at', { ascending: false })
-    .limit(200)
+  const { data, error } = await supabase.rpc('get_conversations', {
+    p_session_id: sessionId,
+    p_pin: pin,
+  })
 
   if (error || !data) return []
 
-  const messages = data as DirectMessage[]
-  const convMap = new Map<string, Conversation>()
-
-  for (const msg of messages) {
-    const isMe = msg.sender_session_id === sessionId
-    const otherSessionId = isMe ? msg.receiver_session_id : msg.sender_session_id
-    const otherAlias = isMe ? msg.receiver_alias : msg.sender_alias
-
-    if (!convMap.has(otherSessionId)) {
-      convMap.set(otherSessionId, {
-        otherSessionId,
-        otherAlias,
-        lastMessage: msg.text,
-        lastMessageAt: msg.created_at,
-        unreadCount: 0,
-        isSender: isMe,
-      })
-    }
-
-    // Count unread (only messages TO me that are unread)
-    if (!isMe && !msg.is_read) {
-      const conv = convMap.get(otherSessionId)!
-      conv.unreadCount++
-    }
-  }
-
-  return Array.from(convMap.values()).sort(
-    (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-  )
+  return (data as Array<{
+    other_session_id: string
+    other_alias: string
+    last_message: string
+    last_message_at: string
+    unread_count: number
+    is_sender: boolean
+  }>).map(row => ({
+    otherSessionId: row.other_session_id,
+    otherAlias: row.other_alias,
+    lastMessage: row.last_message,
+    lastMessageAt: row.last_message_at,
+    unreadCount: Number(row.unread_count),
+    isSender: row.is_sender,
+  }))
 }
 
 export async function getMessages(
   sessionId: string,
-  otherSessionId: string
+  otherSessionId: string,
+  pin: string
 ): Promise<DirectMessage[]> {
-  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId)) return []
+  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId) || !pin) return []
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('direct_messages')
-    .select('*')
-    .or(
-      `and(sender_session_id.eq.${sessionId},receiver_session_id.eq.${otherSessionId}),and(sender_session_id.eq.${otherSessionId},receiver_session_id.eq.${sessionId})`
-    )
-    .order('created_at', { ascending: true })
-    .limit(50)
+  const { data, error } = await supabase.rpc('get_dm_messages', {
+    p_session_id: sessionId,
+    p_other_session_id: otherSessionId,
+    p_pin: pin,
+  })
 
   if (error) return []
   return (data ?? []) as DirectMessage[]
@@ -122,31 +103,30 @@ export async function sendMessage(
   return { message: data as DirectMessage }
 }
 
-export async function getUnreadCount(sessionId: string): Promise<number> {
-  if (!isValidUUID(sessionId)) return 0
+export async function getUnreadCount(sessionId: string, pin: string): Promise<number> {
+  if (!isValidUUID(sessionId) || !pin) return 0
   const supabase = await createClient()
 
-  const { count, error } = await supabase
-    .from('direct_messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('receiver_session_id', sessionId)
-    .eq('is_read', false)
+  const { data, error } = await supabase.rpc('get_unread_dm_count', {
+    p_session_id: sessionId,
+    p_pin: pin,
+  })
 
   if (error) return 0
-  return count ?? 0
+  return data ?? 0
 }
 
 export async function markConversationRead(
   sessionId: string,
-  otherSessionId: string
+  otherSessionId: string,
+  pin: string
 ): Promise<void> {
-  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId)) return
+  if (!isValidUUID(sessionId) || !isValidUUID(otherSessionId) || !pin) return
   const supabase = await createClient()
 
-  await supabase
-    .from('direct_messages')
-    .update({ is_read: true })
-    .eq('sender_session_id', otherSessionId)
-    .eq('receiver_session_id', sessionId)
-    .eq('is_read', false)
+  await supabase.rpc('mark_dm_read', {
+    p_session_id: sessionId,
+    p_other_session_id: otherSessionId,
+    p_pin: pin,
+  })
 }
