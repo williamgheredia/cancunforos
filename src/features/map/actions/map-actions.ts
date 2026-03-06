@@ -27,7 +27,7 @@ export async function getActiveSpots(
 
   const { data, error } = await supabase
     .from('spots')
-    .select('*')
+    .select('id, session_id, name, description, category, emoji, lat, lng, is_active, created_at')
     .eq('is_active', true)
     .gte('lat', lat - latDelta)
     .lte('lat', lat + latDelta)

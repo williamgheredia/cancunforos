@@ -69,29 +69,14 @@ export interface TopUser {
 export async function getTopUsers(): Promise<TopUser[]> {
   const supabase = await createClient()
 
-  // Get all shoutouts, then aggregate client-side (Supabase JS doesn't support GROUP BY)
-  const { data } = await supabase
-    .from('shoutouts')
-    .select('session_id, alias, created_at')
-    .order('created_at', { ascending: false })
+  const { data, error } = await supabase.rpc('get_top_users')
 
-  if (!data || data.length === 0) return []
-
-  // Group by session_id, count shoutouts, keep latest alias
-  const map = new Map<string, { alias: string; count: number }>()
-  for (const row of data) {
-    const existing = map.get(row.session_id)
-    if (existing) {
-      existing.count++
-    } else {
-      map.set(row.session_id, { alias: row.alias, count: 1 })
-    }
-  }
-
-  return Array.from(map.entries())
-    .map(([session_id, { alias, count }]) => ({ session_id, alias, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
+  if (error || !data) return []
+  return (data as { session_id: string; alias: string; count: number }[]).map(r => ({
+    session_id: r.session_id,
+    alias: r.alias,
+    count: Number(r.count),
+  }))
 }
 
 export async function restoreSession(code: string): Promise<{ sessionId: string; alias: string } | null> {

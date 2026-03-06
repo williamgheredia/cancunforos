@@ -19,7 +19,7 @@ export async function getComments(shoutoutId: string): Promise<CommentRow[]> {
 
   const { data, error } = await supabase
     .from('comments')
-    .select('*')
+    .select('id, shoutout_id, session_id, alias, text, created_at')
     .eq('shoutout_id', shoutoutId)
     .order('created_at', { ascending: true })
     .limit(100)

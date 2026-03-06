@@ -44,14 +44,19 @@ export default function HomePage() {
     initSession()
   }, [initSession])
 
-  // Update presence when location is available
+  // Update presence when location is available (debounced to avoid duplicate writes)
+  const presenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => {
     if (sessionId && lat && lng) {
-      upsertPresence(sessionId, alias, lat, lng)
+      clearTimeout(presenceTimeoutRef.current)
+      presenceTimeoutRef.current = setTimeout(() => {
+        upsertPresence(sessionId, alias, lat, lng)
+      }, 5000)
     }
+    return () => clearTimeout(presenceTimeoutRef.current)
   }, [sessionId, alias, lat, lng])
 
-  // Poll unread count every 15s + fetch rank + vibrate on new messages
+  // Poll unread count every 60s + fetch rank + vibrate on new messages
   const prevUnreadRef = useRef(-1)
   useEffect(() => {
     if (!sessionId) return
@@ -68,11 +73,23 @@ export default function HomePage() {
       }).catch(() => {})
     }
     fetchUnread()
-    const interval = setInterval(fetchUnread, 15_000)
+    const interval = setInterval(fetchUnread, 60_000)
 
-    // Fetch rank badge
+    // Fetch rank badge (cached in sessionStorage for 5 min)
+    const cached = sessionStorage.getItem('cancunforos-rank')
+    if (cached) {
+      try {
+        const { badge, ts } = JSON.parse(cached)
+        if (Date.now() - ts < 300_000) {
+          setRankBadge(badge)
+          return () => clearInterval(interval)
+        }
+      } catch { /* ignore */ }
+    }
     getShoutoutCount(sessionId).then(count => {
-      setRankBadge(getRank(count).badge)
+      const badge = getRank(count).badge
+      setRankBadge(badge)
+      sessionStorage.setItem('cancunforos-rank', JSON.stringify({ badge, ts: Date.now() }))
     }).catch(() => {})
 
     return () => clearInterval(interval)
@@ -219,9 +236,11 @@ export default function HomePage() {
               setShowMyShoutouts(false)
               setShowProfile(false)
               setTab('feed')
-              // Refresh rank badge
+              // Refresh rank badge (invalidate cache)
               getShoutoutCount(sessionId).then(count => {
-                setRankBadge(getRank(count).badge)
+                const badge = getRank(count).badge
+                setRankBadge(badge)
+                sessionStorage.setItem('cancunforos-rank', JSON.stringify({ badge, ts: Date.now() }))
               }).catch(() => {})
             }}
           />

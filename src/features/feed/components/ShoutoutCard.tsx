@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { memo, useState, useTransition } from 'react'
 import type { ShoutoutRow } from '../actions/feed-actions'
 import { reactToShoutout } from '../actions/reaction-actions'
 import { reportShoutout } from '../actions/report-actions'
@@ -82,7 +82,7 @@ interface ShoutoutCardProps {
   onViewOnMap?: (shoutout: ShoutoutRow) => void
 }
 
-export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, userReaction, onViewOnMap }: ShoutoutCardProps) {
+export const ShoutoutCard = memo(function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, userReaction, onViewOnMap }: ShoutoutCardProps) {
   const distance = calculateDistance(userLat, userLng, shoutout.lat, shoutout.lng)
   const [expanded, setExpanded] = useState(false)
   const [confirm, setConfirm] = useState(shoutout.reactions_confirm)
@@ -265,4 +265,4 @@ export function ShoutoutCard({ shoutout, userLat, userLng, sessionId, alias, use
       )}
     </div>
   )
-}
+})
