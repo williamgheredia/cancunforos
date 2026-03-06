@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useSessionStore } from '@/shared/stores/session-store'
-import { getShoutoutCount, getOrCreateRecoveryCode, restoreSession, getTopUsers, type TopUser } from '../actions/profile-actions'
+import { getProfileData, getShoutoutCount, getOrCreateRecoveryCode, restoreSession, getTopUsers, type TopUser, type ProfileData } from '../actions/profile-actions'
 import { getMyShoutouts } from '@/features/feed/actions/feed-actions'
 import type { ShoutoutRow } from '@/features/feed/actions/feed-actions'
 import { getRank } from '@/shared/lib/rank-utils'
@@ -37,20 +37,14 @@ export function ProfileView({ onClose, onCreateShoutout }: ProfileViewProps) {
   useEffect(() => {
     if (!sessionId) return
 
-    async function load() {
-      setLoading(true)
-      const [c, s, code] = await Promise.all([
-        getShoutoutCount(sessionId),
-        getMyShoutouts(sessionId),
-        getOrCreateRecoveryCode(sessionId),
-      ])
-      setCount(c)
-      setShoutouts(s)
-      setRecoveryCode(code)
-      setLoading(false)
-    }
-
-    load()
+    getProfileData(sessionId)
+      .then(({ count: c, shoutouts: s, recoveryCode: code }) => {
+        setCount(c)
+        setShoutouts(s as ShoutoutRow[])
+        setRecoveryCode(code)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [sessionId])
 
   // Load ranking lazily when tab switches
@@ -86,14 +80,10 @@ export function ProfileView({ onClose, onCreateShoutout }: ProfileViewProps) {
       restoreStore(result.sessionId, result.alias)
       setShowRestore(false)
       setRestoreCode('')
-      const [c, s, code] = await Promise.all([
-        getShoutoutCount(result.sessionId),
-        getMyShoutouts(result.sessionId),
-        getOrCreateRecoveryCode(result.sessionId),
-      ])
-      setCount(c)
-      setShoutouts(s)
-      setRecoveryCode(code)
+      const profile = await getProfileData(result.sessionId)
+      setCount(profile.count)
+      setShoutouts(profile.shoutouts as ShoutoutRow[])
+      setRecoveryCode(profile.recoveryCode)
     })
   }
 

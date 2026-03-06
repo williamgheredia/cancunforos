@@ -16,6 +16,75 @@ export async function getShoutoutCount(sessionId: string): Promise<number> {
   return count ?? 0
 }
 
+export interface ProfileData {
+  count: number
+  shoutouts: Array<{
+    id: string
+    session_id: string
+    alias: string
+    text: string
+    summary: string
+    category: string
+    emoji: string
+    source: string
+    lat: number
+    lng: number
+    reactions_confirm: number
+    reactions_doubt: number
+    reports_count: number
+    is_collapsed: boolean
+    comments_count: number
+    is_promo: boolean
+    created_at: string
+    expires_at: string
+  }>
+  recoveryCode: string | null
+}
+
+/** Single server action that loads all profile data in one round-trip */
+export async function getProfileData(sessionId: string): Promise<ProfileData> {
+  if (!UUID_RE.test(sessionId)) return { count: 0, shoutouts: [], recoveryCode: null }
+
+  const supabase = await createClient()
+  const serviceClient = createServiceClient()
+
+  // Run all queries in parallel with shared clients
+  const [countResult, shoutoutsResult, codeResult] = await Promise.all([
+    supabase
+      .from('shoutouts')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId),
+    supabase
+      .from('shoutouts')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    serviceClient
+      .from('recovery_codes')
+      .select('code_display')
+      .eq('session_id', sessionId)
+      .single(),
+  ])
+
+  const count = countResult.count ?? 0
+  const shoutouts = (shoutoutsResult.data ?? []) as ProfileData['shoutouts']
+  let recoveryCode: string | null = codeResult.data?.code_display ?? null
+
+  // If no recovery code exists and user is eligible (5+ shoutouts), create one
+  if (!recoveryCode && count >= 5) {
+    const code = generateCode()
+    const { error } = await serviceClient.from('recovery_codes').insert({
+      session_id: sessionId,
+      code_hash: code.replace('-', '').toUpperCase(),
+      code_display: code,
+    })
+    if (!error) recoveryCode = code
+  }
+
+  return { count, shoutouts, recoveryCode }
+}
+
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1 to avoid confusion
   let code = ''
