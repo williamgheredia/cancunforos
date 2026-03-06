@@ -46,10 +46,9 @@ export async function getProfileData(sessionId: string): Promise<ProfileData> {
   if (!UUID_RE.test(sessionId)) return { count: 0, shoutouts: [], recoveryCode: null }
 
   const supabase = await createClient()
-  const serviceClient = createServiceClient()
 
-  // Run all queries in parallel with shared clients
-  const [countResult, shoutoutsResult, codeResult] = await Promise.all([
+  // Core queries with anon client — must succeed for profile to render
+  const [countResult, shoutoutsResult] = await Promise.all([
     supabase
       .from('shoutouts')
       .select('*', { count: 'exact', head: true })
@@ -60,26 +59,34 @@ export async function getProfileData(sessionId: string): Promise<ProfileData> {
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false })
       .limit(50),
-    serviceClient
-      .from('recovery_codes')
-      .select('code_display')
-      .eq('session_id', sessionId)
-      .single(),
   ])
 
   const count = countResult.count ?? 0
   const shoutouts = (shoutoutsResult.data ?? []) as ProfileData['shoutouts']
-  let recoveryCode: string | null = codeResult.data?.code_display ?? null
 
-  // If no recovery code exists and user is eligible (5+ shoutouts), create one
-  if (!recoveryCode && count >= 5) {
-    const code = generateCode()
-    const { error } = await serviceClient.from('recovery_codes').insert({
-      session_id: sessionId,
-      code_hash: code.replace('-', '').toUpperCase(),
-      code_display: code,
-    })
-    if (!error) recoveryCode = code
+  // Recovery code — isolated so it can't kill profile data
+  let recoveryCode: string | null = null
+  try {
+    const serviceClient = createServiceClient()
+    const { data } = await serviceClient
+      .from('recovery_codes')
+      .select('code_display')
+      .eq('session_id', sessionId)
+      .maybeSingle()
+
+    recoveryCode = data?.code_display ?? null
+
+    if (!recoveryCode && count >= 5) {
+      const code = generateCode()
+      const { error } = await serviceClient.from('recovery_codes').insert({
+        session_id: sessionId,
+        code_hash: code.replace('-', '').toUpperCase(),
+        code_display: code,
+      })
+      if (!error) recoveryCode = code
+    }
+  } catch {
+    // Service client unavailable — profile still loads without recovery code
   }
 
   return { count, shoutouts, recoveryCode }
