@@ -59,7 +59,7 @@ export const siteConfig: SiteConfig = {
     textMaxChars: 280,
     shoutoutTTLHours: 24,
     spotInactivityDays: 7,
-    radiusKm: 5,
+    radiusKm: 3,
     collapseDoubtThreshold: 0.6,
   },
 }

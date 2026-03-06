@@ -12,9 +12,8 @@ interface TopShoutoutsProps {
 }
 
 const RANGES = [
-  { label: '5-10 KM', min: 5, max: 10 },
-  { label: '10-15 KM', min: 10, max: 15 },
-  { label: '15-20 KM', min: 15, max: 20 },
+  { label: '0-3 KM', min: 0, max: 3 },
+  { label: '3-10 KM', min: 3, max: 10 },
 ]
 
 export function TopShoutouts({ lat, lng }: TopShoutoutsProps) {
