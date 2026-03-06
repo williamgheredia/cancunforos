@@ -1,10 +1,16 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { siteConfig } from '@/config/siteConfig'
+import { ServiceWorkerRegister } from '@/shared/components/ServiceWorkerRegister'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: siteConfig.seo.siteTitle,
   description: siteConfig.seo.defaultDescription,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: siteConfig.appName,
+  },
   openGraph: {
     title: siteConfig.seo.siteTitle,
     description: siteConfig.seo.defaultDescription,
@@ -14,6 +20,14 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  themeColor: '#facc15',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -21,7 +35,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
+      <body>
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   )
 }
