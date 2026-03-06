@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export interface CommentRow {
   id: string
   shoutout_id: string
@@ -12,6 +14,7 @@ export interface CommentRow {
 }
 
 export async function getComments(shoutoutId: string): Promise<CommentRow[]> {
+  if (!UUID_RE.test(shoutoutId)) return []
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -31,6 +34,9 @@ export async function addComment(input: {
   alias: string
   text: string
 }): Promise<{ success: true; comment: CommentRow } | { error: string }> {
+  if (!UUID_RE.test(input.shoutoutId) || !UUID_RE.test(input.sessionId)) {
+    return { error: 'ID invalido' }
+  }
   const text = input.text.trim()
   if (!text || text.length > 280) {
     return { error: 'El comentario debe tener entre 1 y 280 caracteres' }

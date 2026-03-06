@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { siteConfig } from '@/config/siteConfig'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 type ReactionType = 'confirm' | 'doubt'
 
 interface ReactionResult {
@@ -16,6 +18,7 @@ export async function reactToShoutout(
   sessionId: string,
   type: ReactionType
 ): Promise<ReactionResult | { error: string }> {
+  if (!UUID_RE.test(shoutoutId) || !UUID_RE.test(sessionId)) return { error: 'ID invalido' }
   const supabase = await createClient()
 
   // Check if user already reacted
@@ -69,7 +72,7 @@ export async function reactToShoutout(
 
     const total = shoutout.reactions_confirm + shoutout.reactions_doubt
     const shouldCollapse = total > 0 && shoutout.reactions_doubt / total >= siteConfig.features.collapseDoubtThreshold
-    await supabase.from('shoutouts').update({ is_collapsed: shouldCollapse }).eq('id', shoutoutId)
+    await supabase.rpc('set_shoutout_collapsed', { p_shoutout_id: shoutoutId, p_collapsed: shouldCollapse })
 
     return { confirm: shoutout.reactions_confirm, doubt: shoutout.reactions_doubt, userReaction: type }
   }
@@ -102,7 +105,7 @@ export async function reactToShoutout(
   const total = shoutout.reactions_confirm + shoutout.reactions_doubt
   const shouldCollapse = total > 0 && shoutout.reactions_doubt / total >= siteConfig.features.collapseDoubtThreshold
   if (shouldCollapse) {
-    await supabase.from('shoutouts').update({ is_collapsed: true }).eq('id', shoutoutId)
+    await supabase.rpc('set_shoutout_collapsed', { p_shoutout_id: shoutoutId, p_collapsed: true })
   }
 
   return { confirm: shoutout.reactions_confirm, doubt: shoutout.reactions_doubt, userReaction: type }
@@ -112,14 +115,16 @@ export async function getUserReactions(
   shoutoutIds: string[],
   sessionId: string
 ): Promise<Record<string, ReactionType>> {
-  if (shoutoutIds.length === 0 || !sessionId) return {}
+  if (shoutoutIds.length === 0 || !UUID_RE.test(sessionId)) return {}
+  const validIds = shoutoutIds.filter(id => UUID_RE.test(id)).slice(0, 100)
+  if (validIds.length === 0) return {}
 
   const supabase = await createClient()
   const { data } = await supabase
     .from('reactions')
     .select('shoutout_id, type')
     .eq('session_id', sessionId)
-    .in('shoutout_id', shoutoutIds)
+    .in('shoutout_id', validIds)
 
   const map: Record<string, ReactionType> = {}
   for (const r of data ?? []) {

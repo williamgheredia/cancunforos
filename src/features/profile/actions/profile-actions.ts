@@ -2,7 +2,10 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function getShoutoutCount(sessionId: string): Promise<number> {
+  if (!UUID_RE.test(sessionId)) return 0
   const supabase = await createClient()
   const { count } = await supabase
     .from('shoutouts')
@@ -23,6 +26,7 @@ function generateCode(): string {
 }
 
 export async function getOrCreateRecoveryCode(sessionId: string): Promise<string | null> {
+  if (!UUID_RE.test(sessionId)) return null
   // Use service client to bypass RLS (SELECT on recovery_codes is blocked for anon)
   const supabase = createServiceClient()
 

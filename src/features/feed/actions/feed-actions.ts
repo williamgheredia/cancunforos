@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { getBoundingBox } from '@/shared/lib/geo-utils'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export interface ShoutoutRow {
   id: string
   session_id: string
@@ -71,6 +73,7 @@ export async function getActiveShoutouts(
 }
 
 export async function getMyShoutouts(sessionId: string): Promise<ShoutoutRow[]> {
+  if (!UUID_RE.test(sessionId)) return []
   const supabase = await createClient()
 
   const { data, error } = await supabase
