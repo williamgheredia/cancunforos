@@ -14,16 +14,17 @@ interface InboxViewProps {
   lat: number
   lng: number
   openChatWith?: { sessionId: string; alias: string } | null
+  onUnreadUpdate?: (count: number) => void
 }
 
 type View = 'list' | 'chat' | 'people'
 
-export function InboxView({ lat, lng, openChatWith }: InboxViewProps) {
+export function InboxView({ lat, lng, openChatWith, onUnreadUpdate }: InboxViewProps) {
   const [pin, setPin] = useState<string | null>(null)
 
   return (
     <PinGate onPinReady={setPin}>
-      {pin && <InboxContent lat={lat} lng={lng} openChatWith={openChatWith} pin={pin} />}
+      {pin && <InboxContent lat={lat} lng={lng} openChatWith={openChatWith} onUnreadUpdate={onUnreadUpdate} pin={pin} />}
     </PinGate>
   )
 }
@@ -32,12 +33,14 @@ interface InboxContentProps extends InboxViewProps {
   pin: string
 }
 
-function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
+function InboxContent({ lat, lng, openChatWith, onUnreadUpdate, pin }: InboxContentProps) {
   const [view, setView] = useState<View>(openChatWith ? 'chat' : 'list')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [people, setPeople] = useState<PersonRow[]>([])
   const [loading, setLoading] = useState(true)
   const [chatTarget, setChatTarget] = useState<{ sessionId: string; alias: string } | null>(openChatWith ?? null)
+  const [cooldown, setCooldown] = useState(0)
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const { sessionId, alias } = useSessionStore()
   const prevUnreadRef = useRef(0)
 
@@ -60,6 +63,7 @@ function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
         navigator.vibrate?.(200)
       }
       prevUnreadRef.current = totalUnread
+      onUnreadUpdate?.(totalUnread)
       setConversations(data)
     } catch {
       setConversations([])
@@ -72,14 +76,10 @@ function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
     fetchConversations()
   }, [fetchConversations])
 
-  // Auto-refresh every 60s when viewing list
+  // Cleanup cooldown timer on unmount
   useEffect(() => {
-    if (view !== 'list' || !sessionId) return
-    const interval = setInterval(() => {
-      fetchConversations()
-    }, 60_000)
-    return () => clearInterval(interval)
-  }, [view, sessionId, fetchConversations])
+    return () => clearInterval(cooldownRef.current)
+  }, [])
 
   const fetchPeople = useCallback(async () => {
     if (!sessionId) return
@@ -90,6 +90,18 @@ function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
       setPeople([])
     }
   }, [lat, lng, sessionId])
+
+  function handleRefresh() {
+    if (cooldown > 0) return
+    fetchConversations()
+    setCooldown(90)
+    cooldownRef.current = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }
 
   function openChat(targetSessionId: string, targetAlias: string) {
     setChatTarget({ sessionId: targetSessionId, alias: targetAlias })
@@ -174,10 +186,15 @@ function InboxContent({ lat, lng, openChatWith, pin }: InboxContentProps) {
       <div className="bg-orange-300 border-[2.5px] border-black shadow-[4px_4px_0_#000] px-3 py-2 mb-3 flex items-center justify-between">
         <span className="font-black text-sm uppercase">📨 INBOX</span>
         <button
-          onClick={fetchConversations}
-          className="bg-white border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000] transition-all duration-100"
+          onClick={handleRefresh}
+          disabled={cooldown > 0}
+          className={`border-2 border-black px-2 py-0.5 font-black text-xs transition-all duration-100 ${
+            cooldown > 0
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-white shadow-[2px_2px_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#000]'
+          }`}
         >
-          ACTUALIZAR
+          {cooldown > 0 ? `ACTUALIZAR (${cooldown}s)` : 'ACTUALIZAR'}
         </button>
       </div>
 

@@ -9,7 +9,6 @@ import { CreateShoutoutModal } from '@/features/shoutout/components'
 import { InboxView } from '@/features/inbox/components'
 import { ProfileView } from '@/features/profile/components/ProfileView'
 import { upsertPresence } from '@/features/people/actions/people-actions'
-import { getUnreadCount } from '@/features/inbox/actions/inbox-actions'
 import { getShoutoutCount } from '@/features/profile/actions/profile-actions'
 import { getRank } from '@/shared/lib/rank-utils'
 import { DesktopSidebar } from '@/features/feed/components/DesktopSidebar'
@@ -56,33 +55,16 @@ export default function HomePage() {
     return () => clearTimeout(presenceTimeoutRef.current)
   }, [sessionId, alias, lat, lng])
 
-  // Poll unread count every 60s + fetch rank + vibrate on new messages
-  const prevUnreadRef = useRef(-1)
+  // Fetch rank badge on mount (cached in sessionStorage for 5 min)
   useEffect(() => {
     if (!sessionId) return
-    const fetchUnread = () => {
-      const pin = sessionStorage.getItem('cancunforos-inbox-pin')
-      if (!pin) return // Can't check unreads without PIN
-      getUnreadCount(sessionId, pin).then(count => {
-        if (count > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-          // Vibrate on new messages (double pulse)
-          navigator.vibrate?.([200, 100, 200])
-        }
-        prevUnreadRef.current = count
-        setUnreadCount(count)
-      }).catch(() => {})
-    }
-    fetchUnread()
-    const interval = setInterval(fetchUnread, 60_000)
-
-    // Fetch rank badge (cached in sessionStorage for 5 min)
     const cached = sessionStorage.getItem('cancunforos-rank')
     if (cached) {
       try {
         const { badge, ts } = JSON.parse(cached)
         if (Date.now() - ts < 300_000) {
           setRankBadge(badge)
-          return () => clearInterval(interval)
+          return
         }
       } catch { /* ignore */ }
     }
@@ -91,8 +73,6 @@ export default function HomePage() {
       setRankBadge(badge)
       sessionStorage.setItem('cancunforos-rank', JSON.stringify({ badge, ts: Date.now() }))
     }).catch(() => {})
-
-    return () => clearInterval(interval)
   }, [sessionId])
 
   const hasLocation = !geoLoading && !geoError && lat && lng
@@ -205,7 +185,7 @@ export default function HomePage() {
             ) : tab === 'shoutouts' ? (
               <TopShoutouts lat={lat!} lng={lng!} />
             ) : tab === 'inbox' ? (
-              <InboxView lat={lat!} lng={lng!} openChatWith={inboxTarget} />
+              <InboxView lat={lat!} lng={lng!} openChatWith={inboxTarget} onUnreadUpdate={setUnreadCount} />
             ) : (
               <MapView lat={lat!} lng={lng!} focusShoutout={mapFocusShoutout} />
             )}
