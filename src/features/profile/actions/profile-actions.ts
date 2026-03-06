@@ -1,5 +1,6 @@
 'use server'
 
+import { randomInt } from 'crypto'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -20,7 +21,7 @@ function generateCode(): string {
   let code = ''
   for (let i = 0; i < 8; i++) {
     if (i === 4) code += '-'
-    code += chars[Math.floor(Math.random() * chars.length)]
+    code += chars[randomInt(chars.length)]
   }
   return code
 }

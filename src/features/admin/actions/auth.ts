@@ -20,7 +20,7 @@ export async function adminLogin(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return { error: error.message }
+    return { error: 'Credenciales incorrectas' }
   }
 
   // Verify admin role

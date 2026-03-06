@@ -117,6 +117,13 @@ export async function getBanners(): Promise<Banner[]> {
 
 export async function createBanner(input: { title: string; image_url: string; link_url?: string; position?: string }) {
   const supabase = await requireAdmin()
+  // Validate URLs to prevent javascript: XSS
+  if (input.link_url && !input.link_url.startsWith('https://')) {
+    throw new Error('URL debe empezar con https://')
+  }
+  if (!input.image_url.startsWith('https://')) {
+    throw new Error('URL de imagen debe empezar con https://')
+  }
   const { error } = await supabase.from('banners').insert({
     title: input.title,
     image_url: input.image_url,

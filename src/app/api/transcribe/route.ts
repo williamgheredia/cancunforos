@@ -1,7 +1,45 @@
 import { NextResponse } from 'next/server'
 
+// Simple in-memory rate limiter (resets on deploy/restart)
+const rateMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT = 10 // max requests
+const RATE_WINDOW = 60_000 // per minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const entry = rateMap.get(ip)
+  if (!entry || now > entry.resetAt) {
+    rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW })
+    return false
+  }
+  entry.count++
+  return entry.count > RATE_LIMIT
+}
+
+const ALLOWED_ORIGINS = [
+  'https://cancunforos.vercel.app',
+  'https://cancunforos.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
+]
+
 export async function POST(request: Request) {
   try {
+    // Origin validation — block cross-site abuse
+    const origin = request.headers.get('origin') || ''
+    if (origin && !ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    // Rate limiting by IP
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Demasiadas solicitudes. Intenta en un minuto.' },
+        { status: 429 }
+      )
+    }
+
     const formData = await request.formData()
     const audio = formData.get('audio') as File | null
 

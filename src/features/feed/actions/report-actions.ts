@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const VALID_REASONS = ['spam', 'ofensivo', 'falso', 'otro'] as const
 type ReportReason = (typeof VALID_REASONS)[number]
 
@@ -10,6 +11,9 @@ export async function reportShoutout(
   sessionId: string,
   reason: ReportReason
 ): Promise<{ success: true } | { error: string }> {
+  if (!UUID_RE.test(shoutoutId) || !UUID_RE.test(sessionId)) {
+    return { error: 'ID invalido' }
+  }
   if (!VALID_REASONS.includes(reason)) {
     return { error: 'Razon de reporte invalida' }
   }
